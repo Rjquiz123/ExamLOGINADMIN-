@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ExamCore – Testing Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080810;font-family:'Segoe UI',system-ui,sans-serif;color:#e5e7eb}
+input,select,textarea,button{font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(99,102,241,.5);outline-offset:1px}
+button:disabled{opacity:.4;cursor:not-allowed}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:10px}
+.exam-mode{user-select:none;-webkit-user-select:none}
+.exam-mode input,.exam-mode textarea{user-select:text;-webkit-user-select:text}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const SB_URL = "https://erdfywbqbzetadpxmnwt.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyZGZ5d2JxYnpldGFkcHhtbnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjA1OTgsImV4cCI6MjA5Mzk5NjU5OH0.kKqeyPimzq6nAlIguWgttQ35_8hawUJ5Qj0WiXp8s5U";
+
+async function sbFetch(method, table, query, body) {
+  const url = `${SB_URL}/rest/v1/${table}${query?"?"+query:""}`;
+  const opts = { method, headers: { "apikey":SB_KEY, "Authorization":"Bearer "+SB_KEY, "Content-Type":"application/json", "Prefer":"return=representation" } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || res.statusText);
+  if (!text || text==="null") return [];
+  try { return JSON.parse(text); } catch { return []; }
+}
+
+const dbGet    = (t,q)    => sbFetch("GET",    t, q);
+const dbInsert = (t,data) => sbFetch("POST",   t, "", data);
+const dbUpdate = (t,m,d)  => sbFetch("PATCH",  t, Object.entries(m).map(([k,v])=>`${k}=eq.${encodeURIComponent(v)}`).join("&"), d);
+const dbDelete = (t,m)    => sbFetch("DELETE", t, Object.entries(m).map(([k,v])=>`${k}=eq.${encodeURIComponent(v)}`).join("&"));
+
+function uid()      { return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+function fmtDate(d) { try{return new Date(d).toLocaleString();}catch{return d||"—";} }
+const MAX_WARN = 3;
+
+// Announcement type styles
+const ANN_TYPES = {
+  info:    { bg:"rgba(99,102,241,.12)",  border:"rgba(99,102,241,.3)",  icon:"ℹ️",  color:"#a78bfa", label:"Info"    },
+  success: { bg:"rgba(34,197,94,.1)",    border:"rgba(34,197,94,.3)",   icon:"✅",  color:"#22c55e", label:"Success" },
+  warning: { bg:"rgba(234,179,8,.1)",    border:"rgba(234,179,8,.3)",   icon:"⚠️",  color:"#eab308", label:"Warning" },
+  urgent:  { bg:"rgba(239,68,68,.12)",   border:"rgba(239,68,68,.35)",  icon:"🚨",  color:"#ef4444", label:"Urgent"  },
+};
+
+const IC = {
+  clock:  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  plus:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  trash:  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>,
+  edit:   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  logout: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  flag:   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>,
+  warn:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  megaphone: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>,
+};
+
+// ── CONNECTION CHECK ───────────────────────────────────────────────────────────
+function ConnectCheck({ onReady }) {
+  const [st,setSt]=useState("checking"); const [err,setErr]=useState("");
+  async function check(){
+    setSt("checking"); setErr("");
+    try{ await dbGet("admin","select=id&limit=1"); setSt("ok"); setTimeout(()=>onReady(),600); }
+    catch(e){ setSt("error"); setErr(e.message); }
+  }
+  useEffect(()=>{check();},[]);
+  if(st==="ok") return <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#080810",flexDirection:"column",gap:12}}><div style={{fontSize:40}}>✅</div><div style={{color:"#22c55e",fontWeight:700,fontSize:18}}>Connected!</div></div>;
+  if(st==="checking") return <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#080810",flexDirection:"column",gap:16}}><div style={{width:40,height:40,border:"3px solid rgba(99,102,241,.3)",borderTop:"3px solid #a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/><div style={{color:"#6b7280",fontSize:15}}>Connecting to database...</div></div>;
+  return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#080810",flexDirection:"column",gap:16,padding:24}}>
+      <div style={{fontSize:40}}>❌</div>
+      <div style={{color:"#ef4444",fontWeight:700,fontSize:20}}>Connection Failed</div>
+      <div style={{color:"#9ca3af",fontSize:13,maxWidth:420,textAlign:"center",lineHeight:1.8}}>{err}</div>
+      <button onClick={check} style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",borderRadius:8,padding:"11px 32px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>Retry Connection</button>
+    </div>
+  );
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [ready,setReady]=useState(false); const [session,setSession]=useState(null); const [screen,setScreen]=useState("home");
+  function logout(){ setSession(null); setScreen("home"); }
+  if(!ready) return <ConnectCheck onReady={()=>setReady(true)}/>;
+  if(session?.role==="admin")     return <AdminDashboard onLogout={logout}/>;
+  if(session?.role==="candidate") return <CandidateDashboard user={session.user} onLogout={logout}/>;
+  return (
+    <div style={S.root}>
+      {screen==="home"      && <Home onAdmin={()=>setScreen("admin")} onCandidate={()=>setScreen("candidate")}/>}
+      {screen==="admin"     && <Login role="admin"     onBack={()=>setScreen("home")} onLogin={()=>setSession({role:"admin"})}/>}
+      {screen==="candidate" && <Login role="candidate" onBack={()=>setScreen("home")} onLogin={u=>setSession({role:"candidate",user:u})}/>}
+    </div>
+  );
+}
+
+function Home({ onAdmin, onCandidate }) {
+  return (
+    <div style={S.homePage}>
+      <div style={{textAlign:"center"}}>
+        <div style={S.logo}>EXAMCORE</div>
+        <div style={{color:"#4b5563",fontSize:12,letterSpacing:"3px",textTransform:"uppercase",marginTop:4}}>Professional Testing Platform</div>
+      </div>
+      <div style={{display:"flex",gap:20,flexWrap:"wrap",justifyContent:"center"}}>
+        <PortalCard title="Admin Portal"     icon="⚙" desc="Create exams · Manage candidates · Release results" color="#6366f1" onClick={onAdmin}/>
+        <PortalCard title="Candidate Portal" icon="✎" desc="Attempt exams · View your scores" color="#8b5cf6" onClick={onCandidate}/>
+      </div>
+    </div>
+  );
+}
+function PortalCard({ title, icon, desc, color, onClick }) {
+  const [h,setH]=useState(false);
+  return (
+    <div style={{...S.portalCard,...(h?{borderColor:color,background:color+"18"}:{})}} onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}>
+      <div style={{fontSize:34,marginBottom:10}}>{icon}</div>
+      <div style={{fontSize:17,fontWeight:800,color:"#f9fafb",marginBottom:6}}>{title}</div>
+      <div style={{fontSize:13,color:"#6b7280",lineHeight:1.6,marginBottom:18}}>{desc}</div>
+      <button style={{...S.btn,background:color}} onClick={onClick}>Enter →</button>
+    </div>
+  );
+}
+
+function Login({ role, onBack, onLogin }) {
+  const [u,setU]=useState(""); const [p,setP]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
+  async function submit(){
+    setErr(""); setLoading(true);
+    try{
+      if(role==="admin"){
+        const rows=await dbGet("admin","select=username,password");
+        if(!rows?.length){setErr("No admin found.");setLoading(false);return;}
+        if(!rows.find(r=>r.username===u&&r.password===p)){setErr("Wrong username or password.");setLoading(false);return;}
+        onLogin();
+      }else{
+        const rows=await dbGet("candidates",`select=*&username=eq.${encodeURIComponent(u)}`);
+        if(!rows?.length){setErr("No account found. Contact your admin.");setLoading(false);return;}
+        const m=rows.find(r=>r.password===p);
+        if(!m){setErr("Wrong password.");setLoading(false);return;}
+        onLogin({id:m.id,name:m.name,username:m.username,email:m.email});
+      }
+    }catch(e){setErr("Error: "+e.message);}
+    setLoading(false);
+  }
+  return (
+    <div style={S.loginWrap}>
+      <div style={S.loginBox}>
+        <button style={{background:"none",border:"none",color:"#6b7280",cursor:"pointer",fontSize:13,marginBottom:16,padding:0}} onClick={onBack}>← Back</button>
+        <div style={{fontSize:22,fontWeight:800,color:"#f9fafb",marginBottom:4}}>{role==="admin"?"Admin Login":"Candidate Login"}</div>
+        <div style={{fontSize:12,color:"#4b5563",marginBottom:22}}>{role==="candidate"?"Use credentials provided by your admin":"Enter your admin credentials"}</div>
+        <div style={{marginBottom:14}}><label style={S.label}>Username</label><input style={S.inp} value={u} autoFocus onChange={e=>setU(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Username"/></div>
+        <div style={{marginBottom:14}}><label style={S.label}>Password</label><input style={S.inp} type="password" value={p} onChange={e=>setP(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Password"/></div>
+        {err&&<div style={S.errBox}>{err}</div>}
+        <button style={{...S.btn,width:"100%",justifyContent:"center",marginTop:6}} onClick={submit} disabled={loading}>{loading?"Please wait...":"Login"}</button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ADMIN DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+function AdminDashboard({ onLogout }) {
+  const [tab,setTab]=useState("quizzes");
+  return (
+    <div style={S.shell}>
+      <Sidebar role="Admin" name="Administrator"
+        tabs={[
+          {id:"quizzes",    icon:"📋", label:"Quizzes"},
+          {id:"candidates", icon:"👥", label:"Candidates"},
+          {id:"results",    icon:"📊", label:"Results"},
+          {id:"announce",   icon:"📢", label:"Announcements"},
+          {id:"violations", icon:"🛡", label:"Violations"},
+        ]}
+        active={tab} onTab={setTab} onLogout={onLogout}/>
+      <div style={S.main}>
+        {tab==="quizzes"    && <QuizManager/>}
+        {tab==="candidates" && <CandidateManager/>}
+        {tab==="results"    && <ResultsManager/>}
+        {tab==="announce"   && <AnnouncementManager/>}
+        {tab==="violations" && <ViolationsPanel/>}
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ role, name, tabs, active, onTab, onLogout }) {
+  return (
+    <div style={S.sidebar}>
+      <div style={{padding:"0 18px 14px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+        <div style={{fontSize:15,fontWeight:900,color:"#a78bfa",letterSpacing:"-1px"}}>EXAMCORE</div>
+        <div style={{fontSize:10,color:"#4b5563",textTransform:"uppercase",letterSpacing:"1px"}}>{role}</div>
+        <div style={{fontSize:13,color:"#6b7280",marginTop:6}}>{name}</div>
+      </div>
+      <nav style={{flex:1,paddingTop:8}}>
+        {tabs.map(t=>(<button key={t.id} style={{...S.navBtn,...(active===t.id?S.navActive:{})}} onClick={()=>onTab(t.id)}>{t.icon} {t.label}</button>))}
+      </nav>
+      <button style={{display:"flex",alignItems:"center",gap:7,background:"none",border:"none",color:"#4b5563",cursor:"pointer",padding:"12px 18px",fontSize:13}} onClick={onLogout}>{IC.logout} Logout</button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANNOUNCEMENT MANAGER (ADMIN)
+// ══════════════════════════════════════════════════════════════════════════════
+function AnnouncementManager() {
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ title:"", message:"", type:"info", active:true });
+  const [saving, setSaving] = useState(false);
+  const f = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  async function load() {
+    setLoading(true);
+    try { const d = await dbGet("announcements","select=*&order=created_at.desc"); setAnnouncements(d||[]); }
+    catch(e) { console.error(e); }
+    setLoading(false);
+  }
+  useEffect(()=>{ load(); },[]);
+
+  function openNew() { setForm({title:"",message:"",type:"info",active:true}); setEditing(null); setShowForm(true); }
+  function openEdit(a) { setForm({title:a.title,message:a.message,type:a.type,active:a.active}); setEditing(a.id); setShowForm(true); }
+
+  async function save() {
+    if (!form.title.trim() || !form.message.trim()) return;
+    setSaving(true);
+    try {
+      if (editing) await dbUpdate("announcements",{id:editing},form);
+      else await dbInsert("announcements",{...form, id:uid()});
+      await load(); setShowForm(false); setEditing(null);
+    } catch(e) { alert("Error: "+e.message); }
+    setSaving(false);
+  }
+
+  async function toggle(a) {
+    try { await dbUpdate("announcements",{id:a.id},{active:!a.active}); await load(); }
+    catch(e) { alert(e.message); }
+  }
+
+  async function remove(id) {
+    try { await dbDelete("announcements",{id}); setAnnouncements(p=>p.filter(x=>x.id!==id)); }
+    catch(e) { alert(e.message); }
+  }
+
+  return (
+    <Panel title="Announcements" action={<Btn primary onClick={openNew}>{IC.plus} New Announcement</Btn>}>
+
+      {/* FORM */}
+      {showForm && (
+        <div style={{background:"rgba(99,102,241,.05)",border:"1px solid rgba(99,102,241,.2)",borderRadius:14,padding:22,marginBottom:24,animation:"slideDown .2s ease"}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#f9fafb",marginBottom:16}}>{editing?"Edit Announcement":"New Announcement"}</div>
+          <Grid2>
+            <Field label="Title"><input style={S.inp} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Announcement title"/></Field>
+            <Field label="Type">
+              <select style={S.inp} value={form.type} onChange={e=>f("type",e.target.value)}>
+                {Object.entries(ANN_TYPES).map(([k,v])=>(<option key={k} value={k}>{v.icon} {v.label}</option>))}
+              </select>
+            </Field>
+          </Grid2>
+          <Field label="Message">
+            <textarea style={{...S.inp,minHeight:90,resize:"vertical"}} value={form.message} onChange={e=>f("message",e.target.value)} placeholder="Write your announcement here..."/>
+          </Field>
+          <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#9ca3af",cursor:"pointer"}}>
+              <input type="checkbox" checked={form.active} onChange={e=>f("active",e.target.checked)} style={{width:16,height:16}}/>
+              Active (visible to candidates)
+            </label>
+          </div>
+          {/* PREVIEW */}
+          {(form.title||form.message) && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:"#4b5563",textTransform:"uppercase",letterSpacing:"1px",marginBottom:8,fontWeight:700}}>Preview</div>
+              <AnnouncementCard ann={{...form, created_at:new Date().toISOString()}} preview/>
+            </div>
+          )}
+          <div style={{display:"flex",gap:8}}>
+            <Btn primary onClick={save}>{saving?"Saving...":editing?"Update":"Post Announcement"}</Btn>
+            <Btn ghost onClick={()=>{ setShowForm(false); setEditing(null); }}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+
+      {loading && <Loader/>}
+      {!loading && announcements.length===0 && <Empty text="No announcements yet. Create one to notify candidates."/>}
+
+      {/* STATS ROW */}
+      {announcements.length>0 && (
+        <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+          <div style={S.statBox}><div style={{fontSize:22,fontWeight:900,color:"#a78bfa"}}>{announcements.length}</div><div style={{fontSize:11,color:"#6b7280"}}>Total</div></div>
+          <div style={S.statBox}><div style={{fontSize:22,fontWeight:900,color:"#22c55e"}}>{announcements.filter(a=>a.active).length}</div><div style={{fontSize:11,color:"#6b7280"}}>Active</div></div>
+          <div style={S.statBox}><div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{announcements.filter(a=>a.type==="urgent").length}</div><div style={{fontSize:11,color:"#6b7280"}}>Urgent</div></div>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {announcements.map(a=>(
+          <div key={a.id} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,overflow:"hidden"}}>
+            <AnnouncementCard ann={a}/>
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,.06)",background:"rgba(0,0,0,.2)"}}>
+              <Badge label={a.active?"Active":"Hidden"} color={a.active?"green":"gray"}/>
+              <Badge label={ANN_TYPES[a.type]?.label||a.type} color={a.type==="urgent"?"red":a.type==="warning"?"yellow":a.type==="success"?"green":"purple"}/>
+              <span style={{fontSize:11,color:"#4b5563",marginLeft:"auto"}}>{fmtDate(a.created_at)}</span>
+              <button onClick={()=>toggle(a)} style={{background:a.active?"rgba(239,68,68,.1)":"rgba(34,197,94,.1)",border:`1px solid ${a.active?"rgba(239,68,68,.2)":"rgba(34,197,94,.2)"}`,borderRadius:6,padding:"4px 10px",color:a.active?"#ef4444":"#22c55e",cursor:"pointer",fontSize:12,fontWeight:600}}>
+                {a.active?"Hide":"Show"}
+              </button>
+              <Btn onClick={()=>openEdit(a)}>{IC.edit}</Btn>
+              <Btn danger onClick={()=>remove(a.id)}>{IC.trash}</Btn>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+// Reusable announcement card
+function AnnouncementCard({ ann, preview }) {
+  const t = ANN_TYPES[ann.type] || ANN_TYPES.info;
+  return (
+    <div style={{background:t.bg, borderLeft:`4px solid ${t.border.replace("rgba","rgba").replace(".3",".8")}`, padding:"14px 18px", borderRadius: preview ? 10 : 0}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+        <span style={{fontSize:18}}>{t.icon}</span>
+        <span style={{fontSize:15,fontWeight:700,color:t.color}}>{ann.title}</span>
+        {!preview && !ann.active && <span style={{fontSize:11,color:"#6b7280",marginLeft:"auto"}}>Hidden</span>}
+      </div>
+      <div style={{fontSize:14,color:"#d1d5db",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{ann.message}</div>
+    </div>
+  );
+}
+
+// ── VIOLATIONS ────────────────────────────────────────────────────────────────
+function ViolationsPanel() {
+  const [data,setData]=useState([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{(async()=>{
+    setLoading(true);
+    try{
+      const [subs,cands,quizzes]=await Promise.all([dbGet("submissions","select=id,candidate_id,quiz_id,violations,submitted_at"),dbGet("candidates","select=id,name"),dbGet("quizzes","select=id,title")]);
+      setData((subs||[]).map(s=>({...s,violations:s.violations||[],candidateName:(cands||[]).find(c=>c.id===s.candidate_id)?.name||"Unknown",quizTitle:(quizzes||[]).find(q=>q.id===s.quiz_id)?.title||"Unknown"})).filter(s=>s.violations.length>0));
+    }catch(e){console.error(e);}
+    setLoading(false);
+  })();},[]);
+  return (
+    <Panel title="Anti-Cheat Violations">
+      {loading&&<Loader/>}
+      {!loading&&data.length===0&&<Empty text="No violations recorded."/>}
+      {data.map(s=>(
+        <div key={s.id} style={{...S.examCard,borderColor:"rgba(239,68,68,.25)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:"#f9fafb"}}>{s.candidateName}</span>
+            <span style={{color:"#6b7280",fontSize:13}}>— {s.quizTitle}</span>
+            <Badge label={`${s.violations.length} violation${s.violations.length>1?"s":""}`} color="red"/>
+          </div>
+          {s.violations.map((v,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,.07)",borderRadius:6,padding:"7px 10px",marginBottom:5}}>
+              {IC.warn} <strong>#{i+1}</strong> &nbsp;{v.type}
+              <span style={{color:"#6b7280",fontSize:11,marginLeft:"auto"}}>{fmtDate(v.time)}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+// ── QUIZ MANAGER ──────────────────────────────────────────────────────────────
+function QuizManager() {
+  const [quizzes,setQuizzes]=useState([]); const [editing,setEditing]=useState(null); const [loading,setLoading]=useState(true);
+  async function load(){setLoading(true);try{const d=await dbGet("quizzes","select=*&order=created_at.desc");setQuizzes((d||[]).map(q=>({...q,scheduledFor:q.scheduled_for,resultsReleased:q.results_released})));}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function saveQuiz(form){
+    const p={title:form.title,duration:form.duration,scheduled_for:form.scheduledFor||null,status:form.status,questions:form.questions||[]};
+    try{if(form.id)await dbUpdate("quizzes",{id:form.id},p);else await dbInsert("quizzes",{...p,id:uid(),results_released:false});await load();}catch(e){alert("Error: "+e.message);}
+    setEditing(null);
+  }
+  async function deleteQuiz(id){try{await dbDelete("quizzes",{id});setQuizzes(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  if(editing!==null) return <QuizEditor quiz={editing.id?editing:null} onSave={saveQuiz} onCancel={()=>setEditing(null)}/>;
+  return (
+    <Panel title="Quizzes" action={<Btn primary onClick={()=>setEditing({})}>{IC.plus} New Quiz</Btn>}>
+      {loading&&<Loader/>}
+      {!loading&&quizzes.length===0&&<Empty text="No quizzes yet."/>}
+      {quizzes.map(q=>(
+        <Card key={q.id} title={q.title}
+          meta={`${q.questions?.length||0} Qs · ${q.duration} min · ${q.scheduledFor?fmtDate(q.scheduledFor):"No schedule"}`}
+          badges={[<Badge key="s" label={q.status||"draft"} color={q.status==="published"?"green":q.status==="graded"?"blue":"gray"}/>,q.resultsReleased?<Badge key="r" label="Released" color="green"/>:null]}
+          actions={[<Btn key="e" onClick={()=>setEditing(q)}>{IC.edit}</Btn>,<Btn key="d" danger onClick={()=>deleteQuiz(q.id)}>{IC.trash}</Btn>]}/>
+      ))}
+    </Panel>
+  );
+}
+
+function QuizEditor({ quiz, onSave, onCancel }) {
+  const blankQ=()=>({type:"mcq",text:"",options:["","","",""],correct:0,marks:4,negMarks:1});
+  const [form,setForm]=useState(quiz||{title:"",duration:60,scheduledFor:"",status:"draft",questions:[]});
+  const [adding,setAdding]=useState(false); const [nq,setNq]=useState(blankQ()); const [saving,setSaving]=useState(false);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  function saveQ(){if(!nq.text.trim())return;setForm(p=>({...p,questions:[...p.questions,{...nq,id:uid()}]}));setNq(blankQ());setAdding(false);}
+  async function handleSave(){if(!form.title.trim())return;setSaving(true);await onSave(form);setSaving(false);}
+  return (
+    <Panel title={quiz?"Edit Quiz":"New Quiz"} action={<div style={{display:"flex",gap:8}}><Btn ghost onClick={onCancel}>Cancel</Btn><Btn primary onClick={handleSave}>{saving?"Saving...":"Save Quiz"}</Btn></div>}>
+      <Grid2>
+        <Field label="Title"><input style={S.inp} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Quiz title"/></Field>
+        <Field label="Duration (min)"><input style={S.inp} type="number" value={form.duration} onChange={e=>f("duration",+e.target.value)}/></Field>
+        <Field label="Schedule"><input style={S.inp} type="datetime-local" value={form.scheduledFor||""} onChange={e=>f("scheduledFor",e.target.value)}/></Field>
+        <Field label="Status">
+          <select style={S.inp} value={form.status} onChange={e=>f("status",e.target.value)}>
+            <option value="draft">Draft (hidden)</option>
+            <option value="published">Published (visible to candidates)</option>
+          </select>
+        </Field>
+      </Grid2>
+      <SecLabel>Questions ({form.questions.length})</SecLabel>
+      {form.questions.map((q,i)=>(
+        <div key={q.id} style={S.qRow}>
+          <span style={S.qTag}>{q.type==="mcq"?"MCQ":q.type==="mcq_multi"?"MULTI":"NUM"}</span>
+          <span style={{flex:1,fontSize:13,color:"#e5e7eb"}}>Q{i+1}: {q.text}</span>
+          <span style={{fontSize:12,color:"#22c55e"}}>+{q.marks}</span>
+          <span style={{fontSize:12,color:"#ef4444"}}>-{q.negMarks}</span>
+          <Btn danger onClick={()=>setForm(p=>({...p,questions:p.questions.filter(x=>x.id!==q.id)}))}>{IC.trash}</Btn>
+        </div>
+      ))}
+      {!adding&&<button style={{...S.btnGhost,marginTop:8}} onClick={()=>setAdding(true)}>{IC.plus} Add Question</button>}
+      {adding&&(
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:18,marginTop:12}}>
+          <Field label="Type">
+            <select style={S.inp} value={nq.type} onChange={e=>setNq(q=>({...q,type:e.target.value,correct:e.target.value==="mcq_multi"?[]:0}))}>
+              <option value="mcq">MCQ – Single Correct</option>
+              <option value="mcq_multi">MCQ – Multiple Correct</option>
+              <option value="numerical">Numerical</option>
+            </select>
+          </Field>
+          <Field label="Question"><textarea style={{...S.inp,minHeight:70}} value={nq.text} onChange={e=>setNq(q=>({...q,text:e.target.value}))} placeholder="Write the question..."/></Field>
+          {(nq.type==="mcq"||nq.type==="mcq_multi")&&nq.options.map((o,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              {nq.type==="mcq"?<input type="radio" checked={nq.correct===i} onChange={()=>setNq(q=>({...q,correct:i}))}/>:<input type="checkbox" checked={Array.isArray(nq.correct)&&nq.correct.includes(i)} onChange={()=>{const c=Array.isArray(nq.correct)?nq.correct:[];setNq(q=>({...q,correct:c.includes(i)?c.filter(x=>x!==i):[...c,i]}));}}/>}
+              <span style={{color:"#6b7280",fontSize:13,width:18}}>{String.fromCharCode(65+i)}.</span>
+              <input style={{...S.inp,flex:1}} value={o} onChange={e=>{const opts=[...nq.options];opts[i]=e.target.value;setNq(q=>({...q,options:opts}));}} placeholder={`Option ${String.fromCharCode(65+i)}`}/>
+            </div>
+          ))}
+          {nq.type==="numerical"&&<Field label="Correct Answer"><input style={S.inp} value={nq.answer||""} onChange={e=>setNq(q=>({...q,answer:e.target.value}))} placeholder="Exact number"/></Field>}
+          <Grid2>
+            <Field label="Marks (+)"><input style={S.inp} type="number" value={nq.marks} onChange={e=>setNq(q=>({...q,marks:+e.target.value}))}/></Field>
+            <Field label="Neg Marks (-)"><input style={S.inp} type="number" value={nq.negMarks} onChange={e=>setNq(q=>({...q,negMarks:+e.target.value}))}/></Field>
+          </Grid2>
+          <div style={{display:"flex",gap:8}}><Btn primary onClick={saveQ}>Add Question</Btn><Btn ghost onClick={()=>setAdding(false)}>Cancel</Btn></div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function CandidateManager() {
+  const [candidates,setCandidates]=useState([]); const [form,setForm]=useState({name:"",username:"",password:"",email:""});
+  const [msg,setMsg]=useState(null); const [loading,setLoading]=useState(true);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  async function load(){setLoading(true);try{const d=await dbGet("candidates","select=id,name,username,email,created_at&order=created_at.desc");setCandidates(d||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function add(){
+    if(!form.name||!form.username||!form.password){setMsg({ok:false,text:"Name, username & password required."});return;}
+    try{
+      const ex=await dbGet("candidates",`select=id&username=eq.${encodeURIComponent(form.username)}`);
+      if(ex?.length>0){setMsg({ok:false,text:"Username already exists."});return;}
+      await dbInsert("candidates",{id:uid(),name:form.name,username:form.username,password:form.password,email:form.email||null});
+      setForm({name:"",username:"",password:"",email:""});setMsg({ok:true,text:"Candidate added."});setTimeout(()=>setMsg(null),2500);load();
+    }catch(e){setMsg({ok:false,text:"Error: "+e.message});}
+  }
+  async function remove(id){try{await dbDelete("candidates",{id});setCandidates(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  return (
+    <Panel title="Candidates">
+      <div style={S.addBox}>
+        <SecLabel>Add New Candidate</SecLabel>
+        <Grid2>
+          <Field label="Full Name *"><input style={S.inp} value={form.name} onChange={e=>f("name",e.target.value)} placeholder="Full name"/></Field>
+          <Field label="Username *"><input style={S.inp} value={form.username} onChange={e=>f("username",e.target.value)} placeholder="Login username"/></Field>
+          <Field label="Password *"><input style={S.inp} value={form.password} onChange={e=>f("password",e.target.value)} placeholder="Password"/></Field>
+          <Field label="Email"><input style={S.inp} value={form.email} onChange={e=>f("email",e.target.value)} placeholder="Optional"/></Field>
+        </Grid2>
+        {msg&&<div style={{fontSize:13,marginBottom:8,color:msg.ok?"#22c55e":"#ef4444"}}>{msg.text}</div>}
+        <Btn primary onClick={add}>{IC.plus} Add Candidate</Btn>
+      </div>
+      <SecLabel>All Candidates ({candidates.length})</SecLabel>
+      {loading&&<Loader/>}{!loading&&candidates.length===0&&<Empty text="No candidates yet."/>}
+      {candidates.map(c=>(<Card key={c.id} title={c.name} meta={`@${c.username}${c.email?" · "+c.email:""}`} actions={[<Btn key="d" danger onClick={()=>remove(c.id)}>{IC.trash}</Btn>]}/>))}
+    </Panel>
+  );
+}
+
+function ResultsManager() {
+  const [quizzes,setQuizzes]=useState([]); const [candidates,setCandidates]=useState([]);
+  const [subs,setSubs]=useState([]); const [sel,setSel]=useState(null);
+  const [loading,setLoading]=useState(true); const [working,setWorking]=useState(false);
+  async function load(){
+    setLoading(true);
+    try{const [q,c,s]=await Promise.all([dbGet("quizzes","select=*&order=created_at.desc"),dbGet("candidates","select=id,name,username"),dbGet("submissions","select=*&order=submitted_at.desc")]);setQuizzes((q||[]).map(x=>({...x,scheduledFor:x.scheduled_for,resultsReleased:x.results_released})));setCandidates(c||[]);setSubs(s||[]);}
+    catch(e){console.error(e);}setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+  const quiz=quizzes.find(q=>q.id===sel); const quizSubs=subs.filter(s=>s.quiz_id===sel); const totalM=quiz?(quiz.questions||[]).reduce((a,q)=>a+q.marks,0):0;
+  function gradeOne(sub,questions){const ans=sub.answers||{};let score=0;for(const q of questions){const a=ans[q.id];if(a===undefined||a===null||a==="")continue;if(q.type==="mcq"){if(+a===q.correct)score+=q.marks;else score-=(q.negMarks||0);}else if(q.type==="mcq_multi"){const cor=[...(Array.isArray(q.correct)?q.correct:[q.correct])].sort().join(",");const giv=[...(Array.isArray(a)?a:[a])].sort().join(",");if(cor===giv)score+=q.marks;else score-=(q.negMarks||0);}else{if(String(a).trim()===String(q.answer).trim())score+=q.marks;else score-=(q.negMarks||0);}}return Math.max(0,score);}
+  async function gradeAll(){if(!quiz)return;setWorking(true);try{for(const s of quizSubs){const sc=gradeOne(s,quiz.questions||[]);await dbUpdate("submissions",{id:s.id},{score:sc,graded:true});}await dbUpdate("quizzes",{id:sel},{status:"graded"});await load();}catch(e){alert(e.message);}setWorking(false);}
+  async function release(){setWorking(true);try{await dbUpdate("quizzes",{id:sel},{results_released:true});await load();}catch(e){alert(e.message);}setWorking(false);}
+  return (
+    <Panel title="Results & Grading">
+      {loading&&<Loader/>}
+      {!loading&&<>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
+          {quizzes.length===0&&<Empty text="No quizzes yet."/>}
+          {quizzes.map(q=>(<button key={q.id} style={{...S.chip,...(sel===q.id?S.chipOn:{})}} onClick={()=>setSel(q.id)}>{q.title}<span style={{...S.badge,marginLeft:6}}>{subs.filter(s=>s.quiz_id===q.id).length}</span></button>))}
+        </div>
+        {quiz&&<>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:"#f9fafb"}}>{quiz.title}</span>
+            <span style={{color:"#6b7280",fontSize:13}}>Total: {totalM} marks</span>
+            <Badge label={quiz.status||"draft"} color={quiz.status==="graded"?"blue":"gray"}/>
+            {quiz.resultsReleased&&<Badge label="Results Released" color="green"/>}
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:16}}>
+            <Btn primary onClick={gradeAll}>{working?"Working...":"Auto-Grade All"}</Btn>
+            {quiz.status==="graded"&&!quiz.resultsReleased&&(<button style={{...S.btn,background:"#15803d"}} onClick={release} disabled={working}>{working?"Working...":"Release to Candidates"}</button>)}
+          </div>
+          {quizSubs.length===0&&<Empty text="No submissions yet."/>}
+          {quizSubs.length>0&&(
+            <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:10,overflow:"hidden"}}>
+              <div style={{...S.tRow,gridTemplateColumns:"2fr 2fr 1fr 1fr 1fr",background:"rgba(255,255,255,.04)",fontWeight:700,color:"#6b7280",fontSize:11,textTransform:"uppercase"}}>
+                <div>Candidate</div><div>Submitted</div><div>Score</div><div>Status</div><div>Violations</div>
+              </div>
+              {quizSubs.map(s=>{const c=candidates.find(x=>x.id===s.candidate_id);const v=s.violations||[];return(
+                <div key={s.id} style={{...S.tRow,gridTemplateColumns:"2fr 2fr 1fr 1fr 1fr"}}>
+                  <div>{c?.name||"—"}</div>
+                  <div style={{fontSize:12,color:"#6b7280"}}>{fmtDate(s.submitted_at)}</div>
+                  <div style={{fontWeight:700,color:s.graded?"#a78bfa":"#4b5563"}}>{s.graded?`${s.score} / ${totalM}`:"—"}</div>
+                  <div><Badge label={s.graded?"Graded":"Pending"} color={s.graded?"green":"gray"}/></div>
+                  <div>{v.length>0?<Badge label={`${v.length} ⚠`} color="red"/>:<span style={{color:"#22c55e",fontSize:12}}>✓ Clean</span>}</div>
+                </div>
+              );})}
+            </div>
+          )}
+        </>}
+      </>}
+    </Panel>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CANDIDATE DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+function CandidateDashboard({ user, onLogout }) {
+  const [tab,setTab]=useState("exams");
+  const [quizzes,setQuizzes]=useState([]);
+  const [subs,setSubs]=useState([]);
+  const [announcements,setAnnouncements]=useState([]);
+  const [active,setActive]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [dismissed,setDismissed]=useState([]);
+
+  async function load(){
+    setLoading(true);
+    try{
+      const [q,s,a]=await Promise.all([
+        dbGet("quizzes","select=*&status=in.(published,graded)"),
+        dbGet("submissions",`select=*&candidate_id=eq.${user.id}`),
+        dbGet("announcements","select=*&active=eq.true&order=created_at.desc"),
+      ]);
+      setQuizzes((q||[]).map(x=>({...x,scheduledFor:x.scheduled_for,resultsReleased:x.results_released})));
+      setSubs(s||[]);
+      setAnnouncements(a||[]);
+    }catch(e){console.error(e);}
+    setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  async function submitQuiz(quizId,answers,violations){
+    try{await dbInsert("submissions",{id:uid(),quiz_id:quizId,candidate_id:user.id,answers,violations:violations||[]});}
+    catch(e){alert("Submit error: "+e.message);}
+    setActive(null); load();
+  }
+
+  if(active) return <Attempt quiz={active} onSubmit={(ans,viols)=>submitQuiz(active.id,ans,viols)}/>;
+
+  const visibleAnnouncements = announcements.filter(a=>!dismissed.includes(a.id));
+
+  return (
+    <div style={S.shell}>
+      <Sidebar role="Candidate" name={user.name}
+        tabs={[
+          {id:"exams",   icon:"📋", label:"Exams"},
+          {id:"results", icon:"📊", label:"My Results"},
+          {id:"notices", icon:"📢", label:`Notices${visibleAnnouncements.length>0?" ("+visibleAnnouncements.length+")":""}`},
+        ]}
+        active={tab} onTab={setTab} onLogout={onLogout}/>
+      <div style={S.main}>
+        {loading&&<Loader/>}
+
+        {/* ANNOUNCEMENT BANNERS — show on exams tab if urgent ones exist */}
+        {!loading && tab==="exams" && visibleAnnouncements.filter(a=>a.type==="urgent").map(a=>(
+          <div key={a.id} style={{marginBottom:12,borderRadius:10,overflow:"hidden",position:"relative",animation:"slideDown .3s ease"}}>
+            <AnnouncementCard ann={a}/>
+            <button onClick={()=>setDismissed(p=>[...p,a.id])} style={{position:"absolute",top:10,right:12,background:"none",border:"none",color:"rgba(255,255,255,.4)",cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
+          </div>
+        ))}
+
+        {!loading&&tab==="exams"&&(
+          <Panel title="Available Exams">
+            {quizzes.length===0&&<Empty text="No exams available right now."/>}
+            {quizzes.map(q=>{
+              const sub=subs.find(s=>s.quiz_id===q.id);
+              const scheduled=q.scheduledFor?new Date(q.scheduledFor):null;
+              const upcoming=scheduled&&new Date()<scheduled;
+              const totalM=(q.questions||[]).reduce((a,x)=>a+x.marks,0);
+              return(
+                <div key={q.id} style={S.examCard}>
+                  <div style={{fontSize:16,fontWeight:700,color:"#f9fafb",marginBottom:6}}>{q.title}</div>
+                  <div style={{fontSize:12,color:"#6b7280",marginBottom:6,display:"flex",alignItems:"center",gap:5}}>{IC.clock} {q.duration} min · {(q.questions||[]).length} Qs · {totalM} marks{scheduled&&<> · {fmtDate(q.scheduledFor)}</>}</div>
+                  <div style={{fontSize:11,color:"#4b5563",marginBottom:10}}>🛡 Anti-cheat enabled</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                    {upcoming&&<Badge label="Not open yet" color="gray"/>}
+                    {sub&&!q.resultsReleased&&<Badge label="Submitted — awaiting results" color="blue"/>}
+                    {sub&&q.resultsReleased&&<Badge label={`Score: ${sub.score} / ${totalM}`} color="green"/>}
+                    {!sub&&!upcoming&&<Btn primary onClick={()=>setActive(q)}>Start Exam →</Btn>}
+                  </div>
+                </div>
+              );
+            })}
+          </Panel>
+        )}
+
+        {!loading&&tab==="results"&&(
+          <Panel title="My Results">
+            {subs.length===0&&<Empty text="No exams attempted yet."/>}
+            {subs.map(s=>{
+              const q=quizzes.find(x=>x.id===s.quiz_id); if(!q)return null;
+              const total=(q.questions||[]).reduce((a,x)=>a+x.marks,0)||1;
+              const v=s.violations||[];
+              return(
+                <div key={s.id} style={S.examCard}>
+                  <div style={{fontSize:16,fontWeight:700,color:"#f9fafb",marginBottom:4}}>{q.title}</div>
+                  <div style={{fontSize:12,color:"#6b7280",marginBottom:10}}>Submitted: {fmtDate(s.submitted_at)}</div>
+                  {q.resultsReleased?<div style={{display:"flex",alignItems:"baseline",gap:8}}><span style={{fontSize:44,fontWeight:900,color:"#a78bfa"}}>{s.score}</span><span style={{fontSize:20,color:"#6b7280"}}>/ {total}</span><span style={{fontSize:15,color:"#22c55e",fontWeight:700}}>{((s.score/total)*100).toFixed(1)}%</span></div>:<Badge label="Results not released yet" color="gray"/>}
+                  {v.length>0&&<div style={{marginTop:8,fontSize:12,color:"#fca5a5"}}>⚠ {v.length} violation(s) recorded</div>}
+                </div>
+              );
+            })}
+          </Panel>
+        )}
+
+        {/* NOTICES TAB */}
+        {!loading&&tab==="notices"&&(
+          <Panel title="Notices & Announcements">
+            {announcements.length===0&&<Empty text="No announcements right now."/>}
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {announcements.map(a=>(
+                <div key={a.id} style={{borderRadius:12,overflow:"hidden",animation:"slideDown .2s ease"}}>
+                  <AnnouncementCard ann={a}/>
+                  <div style={{padding:"8px 18px",background:"rgba(0,0,0,.2)",fontSize:11,color:"#4b5563"}}>
+                    Posted {fmtDate(a.created_at)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── ATTEMPT ───────────────────────────────────────────────────────────────────
+function Attempt({ quiz, onSubmit }) {
+  const [cur,setCur]=useState(0); const [answers,setAnswers]=useState({});
+  const [flags,setFlags]=useState({}); const [visited,setVisited]=useState({0:true});
+  const [secs,setSecs]=useState(quiz.duration*60); const [confirm,setConfirm]=useState(false); const [submitting,setSubmitting]=useState(false);
+  const [violations,setViolations]=useState([]); const [toast,setToast]=useState(null); const [isFS,setIsFS]=useState(false);
+  const timerRef=useRef(null); const violRef=useRef([]); const ansRef=useRef({}); const doneRef=useRef(false);
+  useEffect(()=>{violRef.current=violations;},[violations]);
+  useEffect(()=>{ansRef.current=answers;},[answers]);
+  useEffect(()=>{
+    const el=document.documentElement; const fn=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen;
+    if(fn)fn.call(el).then(()=>setIsFS(true)).catch(()=>{});
+    const chg=()=>{const f=!!(document.fullscreenElement||document.webkitFullscreenElement);setIsFS(f);if(!f&&!doneRef.current)addV("Exited fullscreen");};
+    document.addEventListener("fullscreenchange",chg);document.addEventListener("webkitfullscreenchange",chg);
+    return()=>{document.removeEventListener("fullscreenchange",chg);document.removeEventListener("webkitfullscreenchange",chg);if(document.fullscreenElement)document.exitFullscreen&&document.exitFullscreen();};
+  },[]);
+  useEffect(()=>{const fn=()=>{if(document.hidden&&!doneRef.current)addV("Switched tab / minimized");};document.addEventListener("visibilitychange",fn);return()=>document.removeEventListener("visibilitychange",fn);},[]);
+  useEffect(()=>{const fn=()=>{if(!doneRef.current)addV("Window lost focus");};window.addEventListener("blur",fn);return()=>window.removeEventListener("blur",fn);},[]);
+  useEffect(()=>{const fn=e=>{if(e.ctrlKey||e.metaKey||e.key==="F12"||e.key==="PrintScreen"){e.preventDefault();e.stopPropagation();if(!doneRef.current)addV("Blocked key: "+e.key);}};document.addEventListener("keydown",fn,true);return()=>document.removeEventListener("keydown",fn,true);},[]);
+  useEffect(()=>{const cp=e=>{e.preventDefault();if(!doneRef.current)addV("Copy attempt");};const ps=e=>{e.preventDefault();if(!doneRef.current)addV("Paste attempt");};const rc=e=>{e.preventDefault();if(!doneRef.current)addV("Right-click");};document.addEventListener("copy",cp);document.addEventListener("paste",ps);document.addEventListener("contextmenu",rc);return()=>{document.removeEventListener("copy",cp);document.removeEventListener("paste",ps);document.removeEventListener("contextmenu",rc);};},[]);
+  useEffect(()=>{timerRef.current=setInterval(()=>{setSecs(s=>{if(s<=1){clearInterval(timerRef.current);doSubmit("Time expired");return 0;}return s-1;});},1000);return()=>clearInterval(timerRef.current);},[]);
+  function addV(type){if(doneRef.current)return;const v={type,time:new Date().toISOString()};const upd=[...violRef.current,v];violRef.current=upd;setViolations(upd);setToast({msg:type,count:upd.length,left:MAX_WARN-upd.length});setTimeout(()=>setToast(null),4000);if(upd.length>=MAX_WARN)doSubmit("Auto-submitted: too many violations");}
+  async function doSubmit(reason){if(doneRef.current)return;doneRef.current=true;clearInterval(timerRef.current);setSubmitting(true);const v=reason?[...violRef.current,{type:reason,time:new Date().toISOString()}]:violRef.current;await onSubmit(ansRef.current,v);setSubmitting(false);}
+  function reFS(){const el=document.documentElement;const fn=el.requestFullscreen||el.webkitRequestFullscreen;if(fn)fn.call(el).then(()=>setIsFS(true)).catch(()=>{});}
+  const questions=quiz.questions||[]; const q=questions[cur];
+  const mm=String(Math.floor(secs/60)).padStart(2,"0"); const ss=String(secs%60).padStart(2,"0"); const urgent=secs<300;
+  function go(i){setCur(i);setVisited(v=>({...v,[i]:true}));}
+  function ans(val){if(q.type==="mcq_multi"){const p=Array.isArray(answers[q.id])?answers[q.id]:[];setAnswers(a=>({...a,[q.id]:p.includes(val)?p.filter(x=>x!==val):[...p,val]}));}else setAnswers(a=>({...a,[q.id]:val}));}
+  function clearAns(){setAnswers(a=>{const n={...a};delete n[q.id];return n;});}
+  function qSt(i){const qi=questions[i];const a=answers[qi.id];const has=a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);const fl=flags[qi.id];if(fl&&has)return"fa";if(fl)return"f";if(has)return"a";if(visited[i])return"v";return"n";}
+  const SC={n:"#1f2937",v:"#7f1d1d",a:"#14532d",f:"#78350f",fa:"#581c87"};
+  const answered=questions.filter((_,i)=>{const a=answers[questions[i].id];return a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);}).length;
+  if(!q) return <div style={{padding:40,color:"#f9fafb"}}>No questions found.</div>;
+  return (
+    <div className="exam-mode" style={{display:"flex",flexDirection:"column",minHeight:"100vh",background:"#080810",color:"#e5e7eb"}}>
+      {toast&&(<div style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",zIndex:999,background:"#1a0505",border:"1px solid rgba(239,68,68,.5)",borderRadius:12,padding:"12px 20px",minWidth:300,boxShadow:"0 0 30px rgba(239,68,68,.25)",animation:"shake .4s ease"}}><div style={{color:"#fca5a5",fontWeight:700,fontSize:14,marginBottom:3}}>⚠ {toast.msg}</div><div style={{color:"#ef4444",fontSize:13,fontWeight:700}}>Warning {toast.count}/{MAX_WARN} — {toast.left} more = auto-submit</div></div>)}
+      {!isFS&&(<div style={{background:"rgba(220,38,38,.15)",borderBottom:"1px solid rgba(220,38,38,.3)",padding:"7px 20px",display:"flex",alignItems:"center",gap:10,fontSize:13}}><span style={{color:"#fca5a5"}}>⚠ Not in fullscreen.</span><button onClick={reFS} style={{background:"#dc2626",border:"none",borderRadius:5,padding:"3px 12px",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>Go Fullscreen</button></div>)}
+      <div style={{display:"flex",alignItems:"center",padding:"10px 20px",background:"rgba(0,0,0,.65)",borderBottom:"1px solid rgba(255,255,255,.07)",gap:16,position:"sticky",top:0,zIndex:50}}>
+        <div style={{flex:1,fontWeight:700,fontSize:15,color:"#f9fafb"}}>{quiz.title}</div>
+        {violations.length>0&&<div style={{background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",borderRadius:6,padding:"4px 10px",fontSize:12,color:"#fca5a5"}}>⚠ {violations.length} violation{violations.length>1?"s":""}</div>}
+        <div style={{background:urgent?"rgba(220,38,38,.15)":"rgba(99,102,241,.15)",border:`1px solid ${urgent?"rgba(220,38,38,.4)":"rgba(99,102,241,.3)"}`,borderRadius:8,padding:"6px 14px",fontSize:18,fontWeight:800,color:urgent?"#ef4444":"#a78bfa",display:"flex",alignItems:"center",gap:5}}>{IC.clock} {mm}:{ss}</div>
+        <button style={{...S.btn,background:"#dc2626"}} onClick={()=>setConfirm(true)}>Submit</button>
+      </div>
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        <div style={{flex:1,padding:"28px 36px",overflowY:"auto"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,color:"#6b7280",fontWeight:700}}>Q{cur+1} / {questions.length}</span>
+            <span style={{background:"rgba(99,102,241,.15)",color:"#a78bfa",fontSize:11,padding:"3px 10px",borderRadius:10,fontWeight:700}}>{q.type==="mcq"?"Single Correct":q.type==="mcq_multi"?"Multiple Correct":"Numerical"}</span>
+            <span style={{fontSize:13,color:"#22c55e",fontWeight:700}}>+{q.marks}</span>
+            <span style={{fontSize:13,color:"#ef4444",fontWeight:700}}>-{q.negMarks||0}</span>
+          </div>
+          <div style={{fontSize:17,color:"#f9fafb",lineHeight:1.8,marginBottom:28}}>{q.text}</div>
+          {(q.type==="mcq"||q.type==="mcq_multi")&&(<div style={{display:"flex",flexDirection:"column",gap:10}}>{q.options.map((o,i)=>{const sel=q.type==="mcq_multi"?(Array.isArray(answers[q.id])&&answers[q.id].includes(i)):answers[q.id]===i;return(<button key={i} onClick={()=>ans(i)} style={{display:"flex",alignItems:"center",gap:14,background:sel?"rgba(99,102,241,.15)":"rgba(255,255,255,.04)",border:`1px solid ${sel?"rgba(99,102,241,.5)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"13px 18px",cursor:"pointer",textAlign:"left",fontSize:15,color:sel?"#a78bfa":"#e5e7eb",width:"100%"}}><span style={{width:30,height:30,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0}}>{String.fromCharCode(65+i)}</span><span>{o||<em style={{color:"#4b5563"}}>Option {String.fromCharCode(65+i)}</em>}</span></button>);})}</div>)}
+          {q.type==="numerical"&&<input style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",borderRadius:10,padding:"13px 18px",color:"#f9fafb",fontSize:22,fontWeight:700,outline:"none",width:220,fontFamily:"monospace"}} type="number" placeholder="Your answer" value={answers[q.id]??""} onChange={e=>ans(e.target.value)}/>}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:28,flexWrap:"wrap"}}>
+            <button style={{background:"none",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,padding:"7px 14px",color:"#6b7280",cursor:"pointer",fontSize:13}} onClick={clearAns}>Clear</button>
+            <button onClick={()=>setFlags(f=>({...f,[q.id]:!f[q.id]}))} style={{background:flags[q.id]?"rgba(180,83,9,.25)":"rgba(180,83,9,.1)",border:`1px solid ${flags[q.id]?"rgba(180,83,9,.5)":"rgba(180,83,9,.2)"}`,borderRadius:6,padding:"7px 14px",color:"#d97706",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",gap:5}}>{IC.flag} {flags[q.id]?"Unflag":"Flag"}</button>
+            <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+              <button disabled={cur===0} onClick={()=>go(cur-1)} style={{background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.2)",borderRadius:6,padding:"7px 14px",color:"#a78bfa",cursor:"pointer",fontSize:13,fontWeight:600}}>← Prev</button>
+              <button disabled={cur===questions.length-1} onClick={()=>go(cur+1)} style={{background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.2)",borderRadius:6,padding:"7px 14px",color:"#a78bfa",cursor:"pointer",fontSize:13,fontWeight:600}}>Next →</button>
+            </div>
+          </div>
+        </div>
+        <div style={{width:215,background:"rgba(0,0,0,.35)",borderLeft:"1px solid rgba(255,255,255,.07)",padding:14,overflowY:"auto",flexShrink:0}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#4b5563",textTransform:"uppercase",letterSpacing:"1px",marginBottom:10}}>Question Palette</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>{[["Answered","#14532d"],["Not Visited","#7f1d1d"],["Flagged","#78350f"],["Flag+Answered","#581c87"],["Not Attempted","#1f2937"]].map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#6b7280"}}><div style={{width:10,height:10,borderRadius:3,background:v,flexShrink:0}}/>{k}</div>))}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:5,marginBottom:12}}>{questions.map((_,i)=>(<button key={i} onClick={()=>go(i)} style={{width:34,height:34,borderRadius:6,border:i===cur?"2px solid #a78bfa":"1px solid rgba(255,255,255,.1)",background:SC[qSt(i)],color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}</div>
+          <div style={{fontSize:12,marginBottom:10}}>
+            <div style={{color:"#22c55e",marginBottom:3}}>✓ {answered} answered</div>
+            <div style={{color:"#ef4444",marginBottom:3}}>✗ {questions.length-answered} remaining</div>
+            {violations.length>0&&<div style={{color:"#fca5a5"}}>⚠ {violations.length} violation{violations.length>1?"s":""}</div>}
+          </div>
+          <button style={{...S.btn,width:"100%",justifyContent:"center",background:"#dc2626",marginBottom:6}} onClick={()=>setConfirm(true)}>Submit Exam</button>
+          {!isFS&&<button onClick={reFS} style={{width:"100%",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.2)",borderRadius:7,padding:"7px",color:"#a78bfa",cursor:"pointer",fontSize:12,fontWeight:600}}>↑ Fullscreen</button>}
+        </div>
+      </div>
+      {confirm&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.87)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}><div style={{background:"#11111f",border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:32,maxWidth:360,width:"90%"}}><div style={{fontSize:20,fontWeight:800,color:"#f9fafb",marginBottom:10}}>Submit Exam?</div><div style={{color:"#9ca3af",lineHeight:2,marginBottom:16}}>Answered: <strong style={{color:"#22c55e"}}>{answered}</strong> &nbsp;·&nbsp; Remaining: <strong style={{color:"#ef4444"}}>{questions.length-answered}</strong><br/>{violations.length>0&&<span style={{color:"#fca5a5"}}>⚠ {violations.length} violation(s) will be reported.<br/></span>}You cannot change answers after submitting.</div><div style={{display:"flex",gap:10,justifyContent:"flex-end"}}><Btn ghost onClick={()=>setConfirm(false)}>Continue</Btn><button style={{...S.btn,background:"#dc2626"}} disabled={submitting} onClick={()=>doSubmit(null)}>{submitting?"Submitting...":"Submit Now"}</button></div></div></div>)}
+    </div>
+  );
+}
+
+// ── SHARED ────────────────────────────────────────────────────────────────────
+function Panel({title,action,children}){return(<div style={{maxWidth:880,margin:"0 auto"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}><h2 style={{fontSize:22,fontWeight:800,color:"#f9fafb",margin:0}}>{title}</h2>{action}</div>{children}</div>);}
+function Card({title,meta,badges=[],actions=[]}){return(<div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:"14px 16px",marginBottom:8}}><div style={{flex:1}}><div style={{fontSize:15,fontWeight:600,color:"#f9fafb",marginBottom:4}}>{title}</div><div style={{fontSize:12,color:"#4b5563",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>{meta}{badges}</div></div><div style={{display:"flex",gap:8}}>{actions}</div></div>);}
+function Field({label,children}){return <div style={{marginBottom:14}}><label style={S.label}>{label}</label>{children}</div>;}
+function Grid2({children}){return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{children}</div>;}
+function SecLabel({children}){return <div style={{fontSize:11,fontWeight:700,color:"#4b5563",textTransform:"uppercase",letterSpacing:"1px",marginBottom:10,marginTop:20}}>{children}</div>;}
+function Empty({text}){return <div style={{color:"#4b5563",fontSize:14,padding:"24px 0",textAlign:"center"}}>{text}</div>;}
+function Loader(){return <div style={{color:"#4b5563",fontSize:14,padding:"24px 0",textAlign:"center"}}>Loading...</div>;}
+function Badge({label,color="gray"}){
+  const c={green:["rgba(34,197,94,.15)","#22c55e"],blue:["rgba(96,165,250,.15)","#60a5fa"],gray:["rgba(107,114,128,.2)","#6b7280"],red:["rgba(239,68,68,.15)","#ef4444"],yellow:["rgba(234,179,8,.15)","#eab308"],purple:["rgba(168,85,247,.15)","#a78bfa"]}[color]||["rgba(107,114,128,.2)","#6b7280"];
+  return <span style={{background:c[0],color:c[1],borderRadius:4,padding:"2px 8px",fontSize:11,fontWeight:700}}>{label}</span>;
+}
+function Btn({children,onClick,primary,ghost,danger,disabled}){
+  let bg="rgba(255,255,255,.05)",border="1px solid rgba(255,255,255,.1)",color="#9ca3af";
+  if(primary){bg="linear-gradient(135deg,#6366f1,#8b5cf6)";border="none";color="#fff";}
+  if(danger){bg="rgba(239,68,68,.1)";border="1px solid rgba(239,68,68,.2)";color="#ef4444";}
+  return <button disabled={disabled} style={{background:bg,border,borderRadius:7,padding:"8px 14px",color,fontWeight:600,fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1}} onClick={onClick}>{children}</button>;
+}
+
+const S={
+  root:{minHeight:"100vh",background:"#080810"},
+  homePage:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:44,padding:24,background:"#080810"},
+  logo:{fontSize:52,fontWeight:900,letterSpacing:"-2px",background:"linear-gradient(135deg,#a78bfa,#60a5fa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"},
+  portalCard:{width:258,padding:26,borderRadius:14,border:"1px solid rgba(255,255,255,.07)",background:"rgba(255,255,255,.02)",transition:"all .2s"},
+  loginWrap:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:24,background:"#080810"},
+  loginBox:{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.09)",borderRadius:16,padding:34,width:"100%",maxWidth:370},
+  label:{display:"block",fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontWeight:700},
+  inp:{width:"100%",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"10px 12px",color:"#f9fafb",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"},
+  errBox:{color:"#ef4444",fontSize:13,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:6,marginBottom:8},
+  btn:{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",borderRadius:8,padding:"9px 18px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6},
+  btnGhost:{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,padding:"8px 14px",color:"#9ca3af",fontWeight:600,fontSize:13,cursor:"pointer"},
+  shell:{display:"flex",minHeight:"100vh",background:"#080810"},
+  sidebar:{width:215,background:"rgba(0,0,0,.45)",borderRight:"1px solid rgba(255,255,255,.06)",display:"flex",flexDirection:"column",padding:"20px 0",flexShrink:0},
+  navBtn:{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"10px 18px",background:"none",border:"none",color:"#6b7280",cursor:"pointer",fontSize:14},
+  navActive:{background:"rgba(99,102,241,.12)",color:"#a78bfa",borderRight:"2px solid #7c3aed"},
+  main:{flex:1,overflowY:"auto",padding:28},
+  addBox:{background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.1)",borderRadius:12,padding:18,marginBottom:20},
+  qRow:{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:8,padding:"10px 12px",marginBottom:6},
+  qTag:{background:"rgba(99,102,241,.2)",color:"#a78bfa",fontSize:10,fontWeight:800,padding:"2px 6px",borderRadius:4},
+  chip:{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:20,padding:"7px 14px",color:"#6b7280",cursor:"pointer",fontSize:13,display:"inline-flex",alignItems:"center"},
+  chipOn:{background:"rgba(99,102,241,.15)",borderColor:"rgba(99,102,241,.4)",color:"#a78bfa"},
+  badge:{background:"rgba(255,255,255,.08)",borderRadius:4,padding:"1px 6px",fontSize:11,color:"#6b7280"},
+  tRow:{display:"grid",gridTemplateColumns:"2fr 2fr 1fr 1fr",padding:"11px 16px",borderBottom:"1px solid rgba(255,255,255,.05)",fontSize:13,color:"#d1d5db",alignItems:"center"},
+  examCard:{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:18,marginBottom:10},
+  statBox:{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:"14px 20px",textAlign:"center",minWidth:80},
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
