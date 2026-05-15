@@ -276,4 +276,534 @@ function AdminOverview({ onNavigate }) {
   const statCards = [
     {label:"Total Quizzes",    value:stats.quizzes,    sub:stats.published+" published",  color:"#6366f1", icon:"📋"},
     {label:"Candidates",       value:stats.candidates,  sub:"Registered",                   color:"#8b5cf6", icon:"👥"},
-    {label:"Submissions",      value:sta
+    {label:"Submissions",      value:stats.submissions, sub:stats.graded+" graded",        color:"#06b6d4", icon:"📝"},
+    {label:"Active Notices",   value:stats.activeAnnouncements, sub:"Live announcements",  color:"#f59e0b", icon:"📢"},
+  ];
+
+  const quickActions = [
+    {label:"New Quiz",         icon:"📋", color:"#6366f1", tab:"quizzes"},
+    {label:"Add Candidate",    icon:"👥", color:"#8b5cf6", tab:"candidates"},
+    {label:"Live Monitor",     icon:"🖥", color:"#22c55e", tab:"monitor"},
+    {label:"Send Announcement",icon:"📢", color:"#f59e0b", tab:"announce"},
+    {label:"Grade Results",    icon:"📊", color:"#06b6d4", tab:"results"},
+    {label:"View Violations",  icon:"🛡", color:"#ef4444", tab:"violations"},
+  ];
+
+  return (
+    <div style={{maxWidth:1000,animation:"fadeIn .3s ease"}}>
+      <div style={{marginBottom:28}}>
+        <div style={{fontSize:22,fontWeight:800,color:"#f9fafb",marginBottom:4}}>Welcome back 👋</div>
+        <div style={{fontSize:14,color:"#4b5563"}}>Here's what's happening with your platform today.</div>
+      </div>
+
+      {/* STAT CARDS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:28}}>
+        {statCards.map(s=>(
+          <div key={s.label} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:"18px 20px",position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:12,right:14,fontSize:24,opacity:.15}}>{s.icon}</div>
+            <div style={{fontSize:11,color:"#4b5563",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:8}}>{s.label}</div>
+            <div style={{fontSize:36,fontWeight:900,color:s.color,lineHeight:1,marginBottom:4}}>{s.value}</div>
+            <div style={{fontSize:12,color:"#374151"}}>{s.sub}</div>
+            <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${s.color}40,${s.color})`}}/>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:28}}>
+        {/* QUICK ACTIONS */}
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#f9fafb",marginBottom:14}}>⚡ Quick Actions</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {quickActions.map(a=>(
+              <button key={a.label} onClick={()=>onNavigate(a.tab)} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:`${a.color}10`,border:`1px solid ${a.color}25`,borderRadius:10,cursor:"pointer",color:a.color,fontSize:12,fontWeight:600,textAlign:"left",transition:"all .15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background=`${a.color}20`;}}
+                onMouseLeave={e=>{e.currentTarget.style.background=`${a.color}10`;}}>
+                <span style={{fontSize:16}}>{a.icon}</span>{a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* RECENT SUBMISSIONS */}
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#f9fafb",marginBottom:14}}>📝 Recent Submissions</div>
+          {recent.length===0&&<div style={{color:"#374151",fontSize:13,textAlign:"center",padding:"16px 0"}}>No submissions yet.</div>}
+          {recent.map((s,i)=>(
+            <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<recent.length-1?"1px solid rgba(255,255,255,.04)":"none"}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(99,102,241,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#a78bfa",flexShrink:0}}>{i+1}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,color:"#e5e7eb",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Candidate {s.candidate_id?.slice(-4)}</div>
+                <div style={{fontSize:11,color:"#374151"}}>{timeAgo(s.submitted_at)}</div>
+              </div>
+              <Badge label={s.graded?"Graded":"Pending"} color={s.graded?"green":"gray"}/>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* QUIZ STATUS TABLE */}
+      <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#f9fafb"}}>📋 Recent Quizzes</div>
+          <button onClick={()=>onNavigate("quizzes")} style={{background:"none",border:"none",color:"#6366f1",cursor:"pointer",fontSize:12,fontWeight:600}}>View all →</button>
+        </div>
+        {stats.recentQuizzes.length===0&&<div style={{color:"#374151",fontSize:13,textAlign:"center",padding:"12px 0"}}>No quizzes yet.</div>}
+        {stats.recentQuizzes.map(q=>(
+          <div key={q.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+            <div style={{width:36,height:36,borderRadius:10,background:"rgba(99,102,241,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>📋</div>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#f9fafb"}}>{q.title}</div><div style={{fontSize:11,color:"#374151"}}>{fmtDateShort(q.created_at)}</div></div>
+            <Badge label={q.status||"draft"} color={q.status==="published"?"green":q.status==="graded"?"blue":"gray"}/>
+            {q.results_released&&<Badge label="Released" color="green"/>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── LIVE MONITOR ──────────────────────────────────────────────────────────────
+function LiveMonitor() {
+  const [quizzes,setQuizzes]=useState([]); const [selQuiz,setSelQuiz]=useState(null); const [sessions,setSessions]=useState([]); const [candidates,setCandidates]=useState([]); const [alerts,setAlerts]=useState([]); const [loading,setLoading]=useState(true); const [alertMsg,setAlertMsg]=useState(""); const [alertType,setAlertType]=useState("warning"); const [targetCand,setTargetCand]=useState("all"); const [sending,setSending]=useState(false); const [lastRefresh,setLastRefresh]=useState(null);
+  const refreshRef=useRef(null);
+  async function loadQuizzes(){try{const [q,c]=await Promise.all([dbGet("quizzes","select=*&status=in.(published,graded)&order=created_at.desc"),dbGet("candidates","select=id,name,username")]);setQuizzes(q||[]);setCandidates(c||[]);}catch(e){console.error(e);}setLoading(false);}
+  async function refreshSessions(){if(!selQuiz)return;try{const [sess,alts]=await Promise.all([dbGet("exam_sessions",`select=*&quiz_id=eq.${selQuiz}&order=last_seen.desc`),dbGet("live_alerts",`select=*&quiz_id=eq.${selQuiz}&order=created_at.desc&limit=20`)]);setSessions(sess||[]);setAlerts(alts||[]);setLastRefresh(new Date());}catch(e){console.error(e);}}
+  useEffect(()=>{loadQuizzes();},[]);
+  useEffect(()=>{refreshSessions();clearInterval(refreshRef.current);if(selQuiz)refreshRef.current=setInterval(refreshSessions,MONITOR_REFRESH);return()=>clearInterval(refreshRef.current);},[selQuiz]);
+  async function sendAlert(){if(!alertMsg.trim()||!selQuiz)return;setSending(true);try{await dbInsert("live_alerts",{id:uid(),quiz_id:selQuiz,candidate_id:targetCand==="all"?null:targetCand,message:alertMsg.trim(),type:alertType});setAlertMsg("");await refreshSessions();}catch(e){alert("Error: "+e.message);}setSending(false);}
+  const quiz=quizzes.find(q=>q.id===selQuiz); const now=Date.now();
+  const online=sessions.filter(s=>s.status==="active"&&(now-new Date(s.last_seen))<ONLINE_THRESH);
+  const offline=sessions.filter(s=>s.status!=="active"||(now-new Date(s.last_seen))>=ONLINE_THRESH);
+  function getCandName(id){return candidates.find(c=>c.id===id)?.name||id;}
+  const AC={warning:{bg:"rgba(234,179,8,.1)",border:"rgba(234,179,8,.4)",color:"#eab308",icon:"⚠️"},urgent:{bg:"rgba(239,68,68,.1)",border:"rgba(239,68,68,.4)",color:"#ef4444",icon:"🚨"},info:{bg:"rgba(99,102,241,.1)",border:"rgba(99,102,241,.4)",color:"#a78bfa",icon:"ℹ️"}};
+  return (
+    <PageWrap title="Live Monitor" subtitle="Real-time exam supervision">
+      {loading&&<Loader/>}
+      {!loading&&<>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
+          {quizzes.length===0&&<Empty text="No published quizzes."/>}
+          {quizzes.map(q=>(<button key={q.id} style={{...Sty.chip,...(selQuiz===q.id?Sty.chipOn:{})}} onClick={()=>setSelQuiz(q.id)}>{q.title}</button>))}
+        </div>
+        {selQuiz&&<>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:20}}>
+            {[{v:sessions.length,l:"In Exam",c:"#a78bfa"},{v:online.length,l:"Online",c:"#22c55e"},{v:offline.length,l:"Offline",c:"#6b7280"},{v:sessions.reduce((a,s)=>a+(s.violations_count||0),0),l:"Violations",c:"#ef4444"},{v:lastRefresh?timeAgo(lastRefresh):"—",l:"Last Refresh",c:"#f59e0b"}].map(({v,l,c})=>(
+              <div key={l} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:"14px 16px",textAlign:"center"}}>
+                <div style={{fontSize:22,fontWeight:900,color:c}}>{v}</div>
+                <div style={{fontSize:11,color:"#4b5563",marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 360px",gap:16}}>
+            <div>
+              <SectionLabel>📡 Candidate Status</SectionLabel>
+              {sessions.length===0&&<Empty text="No candidates have started yet."/>}
+              {sessions.map(s=>{const isOnline=(now-new Date(s.last_seen))<ONLINE_THRESH;const name=getCandName(s.candidate_id);const pct=quiz?(s.answers_count||0)/((quiz.questions||[]).length||1)*100:0;return(
+                <div key={s.id} style={{background:"rgba(255,255,255,.02)",border:`1px solid ${isOnline?"rgba(34,197,94,.2)":"rgba(255,255,255,.05)"}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:isOnline?"#22c55e":"#374151",flexShrink:0,animation:isOnline?"pulse 2s infinite":"none"}}/>
+                    <span style={{fontWeight:600,color:"#f9fafb",flex:1,fontSize:14}}>{name}</span>
+                    <Badge label={isOnline?"Online":"Offline"} color={isOnline?"green":"gray"}/>
+                    {(s.violations_count||0)>0&&<Badge label={`${s.violations_count} ⚠`} color="red"/>}
+                    <button onClick={()=>{setTargetCand(s.candidate_id);setAlertMsg("");}} style={{background:"rgba(234,179,8,.1)",border:"1px solid rgba(234,179,8,.2)",borderRadius:6,padding:"3px 8px",color:"#eab308",cursor:"pointer",fontSize:11,fontWeight:600}}>Flag</button>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{flex:1,background:"rgba(255,255,255,.05)",borderRadius:4,height:4,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,#6366f1,#8b5cf6)",transition:"width .5s"}}/></div>
+                    <span style={{fontSize:11,color:"#4b5563"}}>{s.answers_count||0}/{(quiz?.questions||[]).length||0}</span>
+                    <span style={{fontSize:11,color:"#374151"}}>{timeAgo(s.last_seen)}</span>
+                  </div>
+                </div>
+              );})}
+            </div>
+            <div>
+              <SectionLabel>📨 Send Live Alert</SectionLabel>
+              <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:16,marginBottom:14}}>
+                <Field label="Send To"><select style={Sty.inp} value={targetCand} onChange={e=>setTargetCand(e.target.value)}><option value="all">📢 All Candidates</option>{sessions.map(s=>(<option key={s.id} value={s.candidate_id}>{getCandName(s.candidate_id)}</option>))}</select></Field>
+                <Field label="Type"><select style={Sty.inp} value={alertType} onChange={e=>setAlertType(e.target.value)}><option value="warning">⚠️ Warning</option><option value="urgent">🚨 Urgent</option><option value="info">ℹ️ Info</option></select></Field>
+                <Field label="Message"><textarea style={{...Sty.inp,minHeight:70,resize:"vertical"}} value={alertMsg} onChange={e=>setAlertMsg(e.target.value)} placeholder="Message..."/></Field>
+                <button onClick={sendAlert} disabled={sending||!alertMsg.trim()} style={{...Sty.btn,width:"100%",justifyContent:"center",background:"linear-gradient(135deg,#d97706,#b45309)"}}>{I.send} {sending?"Sending...":"Send Alert"}</button>
+              </div>
+              <SectionLabel>Recent Alerts</SectionLabel>
+              {alerts.length===0&&<div style={{color:"#374151",fontSize:13,textAlign:"center",padding:"12px 0"}}>No alerts sent.</div>}
+              <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
+                {alerts.map(a=>{const ac=AC[a.type]||AC.info;return(<div key={a.id} style={{background:ac.bg,border:`1px solid ${ac.border}`,borderRadius:8,padding:"8px 12px"}}><div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span>{ac.icon}</span><span style={{fontSize:12,fontWeight:700,color:ac.color}}>{a.candidate_id?getCandName(a.candidate_id):"All"}</span><span style={{fontSize:10,color:"#374151",marginLeft:"auto"}}>{timeAgo(a.created_at)}</span></div><div style={{fontSize:12,color:"#d1d5db"}}>{a.message}</div></div>);})}
+              </div>
+            </div>
+          </div>
+        </>}
+      </>}
+    </PageWrap>
+  );
+}
+
+// ── ANNOUNCEMENT MANAGER ──────────────────────────────────────────────────────
+function AnnouncementManager() {
+  const [ann,setAnn]=useState([]); const [loading,setLoading]=useState(true); const [showForm,setShowForm]=useState(false); const [editing,setEditing]=useState(null); const [form,setForm]=useState({title:"",message:"",type:"info",active:true}); const [saving,setSaving]=useState(false);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  async function load(){setLoading(true);try{const d=await dbGet("announcements","select=*&order=created_at.desc");setAnn(d||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  function openNew(){setForm({title:"",message:"",type:"info",active:true});setEditing(null);setShowForm(true);}
+  function openEdit(a){setForm({title:a.title,message:a.message,type:a.type,active:a.active});setEditing(a.id);setShowForm(true);}
+  async function save(){if(!form.title.trim()||!form.message.trim())return;setSaving(true);try{if(editing)await dbUpdate("announcements",{id:editing},form);else await dbInsert("announcements",{...form,id:uid()});await load();setShowForm(false);setEditing(null);}catch(e){alert("Error: "+e.message);}setSaving(false);}
+  async function toggle(a){try{await dbUpdate("announcements",{id:a.id},{active:!a.active});await load();}catch(e){alert(e.message);}}
+  async function remove(id){try{await dbDelete("announcements",{id});setAnn(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  return (
+    <PageWrap title="Announcements" subtitle="Notify all candidates" action={<Btn primary onClick={openNew}>{I.plus} New Announcement</Btn>}>
+      {showForm&&(
+        <div style={{background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.15)",borderRadius:14,padding:20,marginBottom:20,animation:"slideDown .2s ease"}}>
+          <Grid2><Field label="Title"><input style={Sty.inp} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Title"/></Field><Field label="Type"><select style={Sty.inp} value={form.type} onChange={e=>f("type",e.target.value)}>{Object.entries(ANN_TYPES).map(([k,v])=>(<option key={k} value={k}>{v.icon} {v.label}</option>))}</select></Field></Grid2>
+          <Field label="Message"><textarea style={{...Sty.inp,minHeight:80,resize:"vertical"}} value={form.message} onChange={e=>f("message",e.target.value)} placeholder="Message..."/></Field>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#9ca3af",cursor:"pointer",marginBottom:14}}><input type="checkbox" checked={form.active} onChange={e=>f("active",e.target.checked)}/> Active (visible to candidates)</label>
+          <div style={{display:"flex",gap:8}}><Btn primary onClick={save}>{saving?"Saving...":editing?"Update":"Post"}</Btn><Btn ghost onClick={()=>{setShowForm(false);setEditing(null);}}>Cancel</Btn></div>
+        </div>
+      )}
+      {loading&&<Loader/>}
+      {!loading&&ann.length===0&&<Empty text="No announcements yet."/>}
+      {ann.map(a=>{const t=ANN_TYPES[a.type]||ANN_TYPES.info;return(
+        <div key={a.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,overflow:"hidden",marginBottom:8}}>
+          <div style={{background:t.bg,borderLeft:`3px solid ${t.border}`,padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><span style={{fontSize:16}}>{t.icon}</span><span style={{fontWeight:700,color:t.color,fontSize:14}}>{a.title}</span></div><div style={{fontSize:13,color:"#d1d5db",lineHeight:1.6}}>{a.message}</div></div>
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",background:"rgba(0,0,0,.15)"}}><Badge label={a.active?"Active":"Hidden"} color={a.active?"green":"gray"}/><span style={{fontSize:11,color:"#374151",marginLeft:"auto"}}>{fmtDate(a.created_at)}</span><button onClick={()=>toggle(a)} style={{background:a.active?"rgba(239,68,68,.1)":"rgba(34,197,94,.1)",border:`1px solid ${a.active?"rgba(239,68,68,.2)":"rgba(34,197,94,.2)"}`,borderRadius:5,padding:"3px 10px",color:a.active?"#ef4444":"#22c55e",cursor:"pointer",fontSize:12,fontWeight:600}}>{a.active?"Hide":"Show"}</button><Btn onClick={()=>openEdit(a)}>{I.edit}</Btn><Btn danger onClick={()=>remove(a.id)}>{I.trash}</Btn></div>
+        </div>
+      );})}
+    </PageWrap>
+  );
+}
+
+// ── VIOLATIONS ────────────────────────────────────────────────────────────────
+function ViolationsPanel() {
+  const [data,setData]=useState([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{(async()=>{setLoading(true);try{const [subs,cands,quizzes]=await Promise.all([dbGet("submissions","select=id,candidate_id,quiz_id,violations,submitted_at"),dbGet("candidates","select=id,name"),dbGet("quizzes","select=id,title")]);setData((subs||[]).map(s=>({...s,violations:s.violations||[],candidateName:(cands||[]).find(c=>c.id===s.candidate_id)?.name||"Unknown",quizTitle:(quizzes||[]).find(q=>q.id===s.quiz_id)?.title||"Unknown"})).filter(s=>s.violations.length>0));}catch(e){console.error(e);}setLoading(false);})();},[]);
+  return (
+    <PageWrap title="Anti-Cheat Violations" subtitle="Recorded integrity issues">
+      {loading&&<Loader/>}
+      {!loading&&data.length===0&&<Empty text="No violations recorded. All clean ✓"/>}
+      {data.map(s=>(
+        <div key={s.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(239,68,68,.15)",borderRadius:12,padding:16,marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}><span style={{fontWeight:700,color:"#f9fafb"}}>{s.candidateName}</span><span style={{color:"#4b5563",fontSize:13}}>— {s.quizTitle}</span><Badge label={`${s.violations.length} violation${s.violations.length>1?"s":""}`} color="red"/></div>
+          {s.violations.map((v,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,.06)",borderRadius:7,padding:"6px 10px",marginBottom:4}}>{I.warn} <strong>#{i+1}</strong> &nbsp;{v.type}<span style={{color:"#374151",fontSize:11,marginLeft:"auto"}}>{fmtDate(v.time)}</span></div>))}
+        </div>
+      ))}
+    </PageWrap>
+  );
+}
+
+// ── QUIZ MANAGER ──────────────────────────────────────────────────────────────
+function QuizManager() {
+  const [quizzes,setQuizzes]=useState([]); const [editing,setEditing]=useState(null); const [loading,setLoading]=useState(true);
+  async function load(){setLoading(true);try{const d=await dbGet("quizzes","select=*&order=created_at.desc");setQuizzes((d||[]).map(q=>({...q,scheduledFor:q.scheduled_for,resultsReleased:q.results_released})));}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function saveQuiz(form){const p={title:form.title,duration:form.duration,scheduled_for:form.scheduledFor||null,status:form.status,questions:form.questions||[]};try{if(form.id)await dbUpdate("quizzes",{id:form.id},p);else await dbInsert("quizzes",{...p,id:uid(),results_released:false});await load();}catch(e){alert("Error: "+e.message);}setEditing(null);}
+  async function deleteQuiz(id){try{await dbDelete("quizzes",{id});setQuizzes(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  if(editing!==null) return <QuizEditor quiz={editing.id?editing:null} onSave={saveQuiz} onCancel={()=>setEditing(null)}/>;
+  return (
+    <PageWrap title="Quizzes" subtitle="Create and manage exams" action={<Btn primary onClick={()=>setEditing({})}>{I.plus} New Quiz</Btn>}>
+      {loading&&<Loader/>}
+      {!loading&&quizzes.length===0&&<Empty text="No quizzes yet. Create your first one."/>}
+      {quizzes.map(q=>(
+        <div key={q.id} style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:"14px 16px",marginBottom:8}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"rgba(99,102,241,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,marginRight:14}}>📋</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:600,color:"#f9fafb",marginBottom:4}}>{q.title}</div>
+            <div style={{fontSize:12,color:"#4b5563",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <span>{I.clock} {q.duration} min</span>
+              <span>· {q.questions?.length||0} questions</span>
+              <span>· {q.scheduledFor?fmtDate(q.scheduledFor):"No schedule"}</span>
+              <Badge label={q.status||"draft"} color={q.status==="published"?"green":q.status==="graded"?"blue":"gray"}/>
+              {q.resultsReleased&&<Badge label="Released" color="green"/>}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6}}><Btn onClick={()=>setEditing(q)}>{I.edit}</Btn><Btn danger onClick={()=>deleteQuiz(q.id)}>{I.trash}</Btn></div>
+        </div>
+      ))}
+    </PageWrap>
+  );
+}
+
+function QuizEditor({ quiz, onSave, onCancel }) {
+  const blankQ=()=>({type:"mcq",text:"",options:["","","",""],correct:0,marks:4,negMarks:1});
+  const [form,setForm]=useState(quiz||{title:"",duration:60,scheduledFor:"",status:"draft",questions:[]});
+  const [adding,setAdding]=useState(false); const [nq,setNq]=useState(blankQ()); const [saving,setSaving]=useState(false);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  function saveQ(){if(!nq.text.trim())return;setForm(p=>({...p,questions:[...p.questions,{...nq,id:uid()}]}));setNq(blankQ());setAdding(false);}
+  async function handleSave(){if(!form.title.trim())return;setSaving(true);await onSave(form);setSaving(false);}
+  return (
+    <PageWrap title={quiz?"Edit Quiz":"New Quiz"} action={<div style={{display:"flex",gap:8}}><Btn ghost onClick={onCancel}>Cancel</Btn><Btn primary onClick={handleSave}>{saving?"Saving...":"Save Quiz"}</Btn></div>}>
+      <Grid2><Field label="Title"><input style={Sty.inp} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Quiz title"/></Field><Field label="Duration (min)"><input style={Sty.inp} type="number" value={form.duration} onChange={e=>f("duration",+e.target.value)}/></Field><Field label="Schedule"><input style={Sty.inp} type="datetime-local" value={form.scheduledFor||""} onChange={e=>f("scheduledFor",e.target.value)}/></Field><Field label="Status"><select style={Sty.inp} value={form.status} onChange={e=>f("status",e.target.value)}><option value="draft">Draft (hidden)</option><option value="published">Published</option></select></Field></Grid2>
+      <SectionLabel>Questions ({form.questions.length})</SectionLabel>
+      {form.questions.map((q,i)=>(<div key={q.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.05)",borderRadius:8,padding:"10px 12px",marginBottom:6}}><span style={{background:"rgba(99,102,241,.2)",color:"#a78bfa",fontSize:10,fontWeight:800,padding:"2px 6px",borderRadius:4}}>{q.type==="mcq"?"MCQ":q.type==="mcq_multi"?"MULTI":"NUM"}</span><span style={{flex:1,fontSize:13,color:"#e5e7eb"}}>Q{i+1}: {q.text}</span><span style={{fontSize:12,color:"#22c55e"}}>+{q.marks}</span><span style={{fontSize:12,color:"#ef4444"}}>-{q.negMarks}</span><Btn danger onClick={()=>setForm(p=>({...p,questions:p.questions.filter(x=>x.id!==q.id)}))}>{I.trash}</Btn></div>))}
+      {!adding&&<button style={{...Sty.btnGhost,marginTop:8}} onClick={()=>setAdding(true)}>{I.plus} Add Question</button>}
+      {adding&&(<div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:10,padding:18,marginTop:12}}>
+        <Field label="Type"><select style={Sty.inp} value={nq.type} onChange={e=>setNq(q=>({...q,type:e.target.value,correct:e.target.value==="mcq_multi"?[]:0}))}><option value="mcq">MCQ – Single Correct</option><option value="mcq_multi">MCQ – Multiple Correct</option><option value="numerical">Numerical</option></select></Field>
+        <Field label="Question"><textarea style={{...Sty.inp,minHeight:70}} value={nq.text} onChange={e=>setNq(q=>({...q,text:e.target.value}))} placeholder="Question..."/></Field>
+        {(nq.type==="mcq"||nq.type==="mcq_multi")&&nq.options.map((o,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>{nq.type==="mcq"?<input type="radio" checked={nq.correct===i} onChange={()=>setNq(q=>({...q,correct:i}))}/>:<input type="checkbox" checked={Array.isArray(nq.correct)&&nq.correct.includes(i)} onChange={()=>{const c=Array.isArray(nq.correct)?nq.correct:[];setNq(q=>({...q,correct:c.includes(i)?c.filter(x=>x!==i):[...c,i]}));}}/>}<span style={{color:"#4b5563",fontSize:13,width:18}}>{String.fromCharCode(65+i)}.</span><input style={{...Sty.inp,flex:1}} value={o} onChange={e=>{const opts=[...nq.options];opts[i]=e.target.value;setNq(q=>({...q,options:opts}));}} placeholder={`Option ${String.fromCharCode(65+i)}`}/></div>))}
+        {nq.type==="numerical"&&<Field label="Correct Answer"><input style={Sty.inp} value={nq.answer||""} onChange={e=>setNq(q=>({...q,answer:e.target.value}))} placeholder="Exact number"/></Field>}
+        <Grid2><Field label="Marks (+)"><input style={Sty.inp} type="number" value={nq.marks} onChange={e=>setNq(q=>({...q,marks:+e.target.value}))}/></Field><Field label="Neg Marks (-)"><input style={Sty.inp} type="number" value={nq.negMarks} onChange={e=>setNq(q=>({...q,negMarks:+e.target.value}))}/></Field></Grid2>
+        <div style={{display:"flex",gap:8}}><Btn primary onClick={saveQ}>Add Question</Btn><Btn ghost onClick={()=>setAdding(false)}>Cancel</Btn></div>
+      </div>)}
+    </PageWrap>
+  );
+}
+
+function CandidateManager() {
+  const [candidates,setCandidates]=useState([]); const [form,setForm]=useState({name:"",username:"",password:"",email:""}); const [msg,setMsg]=useState(null); const [loading,setLoading]=useState(true);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  async function load(){setLoading(true);try{const d=await dbGet("candidates","select=id,name,username,email,created_at&order=created_at.desc");setCandidates(d||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function add(){if(!form.name||!form.username||!form.password){setMsg({ok:false,text:"Name, username & password required."});return;}try{const ex=await dbGet("candidates",`select=id&username=eq.${encodeURIComponent(form.username)}`);if(ex?.length>0){setMsg({ok:false,text:"Username exists."});return;}await dbInsert("candidates",{id:uid(),name:form.name,username:form.username,password:form.password,email:form.email||null});setForm({name:"",username:"",password:"",email:""});setMsg({ok:true,text:"Candidate added successfully."});setTimeout(()=>setMsg(null),2500);load();}catch(e){setMsg({ok:false,text:"Error: "+e.message});}}
+  async function remove(id){try{await dbDelete("candidates",{id});setCandidates(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  return (
+    <PageWrap title="Candidates" subtitle="Manage registered candidates">
+      <div style={{background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.12)",borderRadius:14,padding:20,marginBottom:24}}>
+        <SectionLabel>Add New Candidate</SectionLabel>
+        <Grid2><Field label="Full Name *"><input style={Sty.inp} value={form.name} onChange={e=>f("name",e.target.value)} placeholder="Full name"/></Field><Field label="Username *"><input style={Sty.inp} value={form.username} onChange={e=>f("username",e.target.value)} placeholder="Login username"/></Field><Field label="Password *"><input style={Sty.inp} value={form.password} onChange={e=>f("password",e.target.value)} placeholder="Password"/></Field><Field label="Email"><input style={Sty.inp} value={form.email} onChange={e=>f("email",e.target.value)} placeholder="Optional"/></Field></Grid2>
+        {msg&&<div style={{fontSize:13,marginBottom:10,color:msg.ok?"#22c55e":"#ef4444",padding:"6px 10px",background:msg.ok?"rgba(34,197,94,.08)":"rgba(239,68,68,.08)",borderRadius:6}}>{msg.text}</div>}
+        <Btn primary onClick={add}>{I.plus} Add Candidate</Btn>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <SectionLabel>All Candidates</SectionLabel>
+        <span style={{fontSize:12,color:"#4b5563",background:"rgba(255,255,255,.04)",padding:"3px 10px",borderRadius:20,fontWeight:700}}>{candidates.length} total</span>
+      </div>
+      {loading&&<Loader/>}{!loading&&candidates.length===0&&<Empty text="No candidates yet."/>}
+      {candidates.map(c=>(
+        <div key={c.id} style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:"12px 16px",marginBottom:8}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#fff",flexShrink:0,marginRight:12}}>{c.name[0]?.toUpperCase()}</div>
+          <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#f9fafb"}}>{c.name}</div><div style={{fontSize:12,color:"#4b5563"}}>@{c.username}{c.email?" · "+c.email:""}</div></div>
+          <span style={{fontSize:11,color:"#374151",marginRight:10}}>{fmtDateShort(c.created_at)}</span>
+          <Btn danger onClick={()=>remove(c.id)}>{I.trash}</Btn>
+        </div>
+      ))}
+    </PageWrap>
+  );
+}
+
+function ResultsManager() {
+  const [quizzes,setQuizzes]=useState([]); const [candidates,setCandidates]=useState([]); const [subs,setSubs]=useState([]); const [sel,setSel]=useState(null); const [loading,setLoading]=useState(true); const [working,setWorking]=useState(false);
+  async function load(){setLoading(true);try{const [q,c,s]=await Promise.all([dbGet("quizzes","select=*&order=created_at.desc"),dbGet("candidates","select=id,name,username"),dbGet("submissions","select=*&order=submitted_at.desc")]);setQuizzes((q||[]).map(x=>({...x,scheduledFor:x.scheduled_for,resultsReleased:x.results_released})));setCandidates(c||[]);setSubs(s||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  const quiz=quizzes.find(q=>q.id===sel); const quizSubs=subs.filter(s=>s.quiz_id===sel); const totalM=quiz?(quiz.questions||[]).reduce((a,q)=>a+q.marks,0):0;
+  function gradeOne(sub,questions){const ans=sub.answers||{};let score=0;for(const q of questions){const a=ans[q.id];if(a===undefined||a===null||a==="")continue;if(q.type==="mcq"){if(+a===q.correct)score+=q.marks;else score-=(q.negMarks||0);}else if(q.type==="mcq_multi"){const cor=[...(Array.isArray(q.correct)?q.correct:[q.correct])].sort().join(",");const giv=[...(Array.isArray(a)?a:[a])].sort().join(",");if(cor===giv)score+=q.marks;else score-=(q.negMarks||0);}else{if(String(a).trim()===String(q.answer).trim())score+=q.marks;else score-=(q.negMarks||0);}}return Math.max(0,score);}
+  async function gradeAll(){if(!quiz)return;setWorking(true);try{for(const s of quizSubs){const sc=gradeOne(s,quiz.questions||[]);await dbUpdate("submissions",{id:s.id},{score:sc,graded:true});}await dbUpdate("quizzes",{id:sel},{status:"graded"});await load();}catch(e){alert(e.message);}setWorking(false);}
+  async function release(){setWorking(true);try{await dbUpdate("quizzes",{id:sel},{results_released:true});await load();}catch(e){alert(e.message);}setWorking(false);}
+  return (
+    <PageWrap title="Results & Grading" subtitle="Grade and release scores">
+      {loading&&<Loader/>}
+      {!loading&&<>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>{quizzes.length===0&&<Empty text="No quizzes yet."/>}{quizzes.map(q=>(<button key={q.id} style={{...Sty.chip,...(sel===q.id?Sty.chipOn:{})}} onClick={()=>setSel(q.id)}>{q.title}<span style={{background:"rgba(255,255,255,.08)",borderRadius:10,padding:"1px 7px",fontSize:11,marginLeft:6}}>{subs.filter(s=>s.quiz_id===q.id).length}</span></button>))}</div>
+        {quiz&&<>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap",padding:"12px 16px",background:"rgba(255,255,255,.02)",borderRadius:12,border:"1px solid rgba(255,255,255,.06)"}}>
+            <span style={{fontWeight:700,color:"#f9fafb",flex:1}}>{quiz.title}</span>
+            <span style={{color:"#4b5563",fontSize:13}}>Total: {totalM} marks</span>
+            <Badge label={quiz.status||"draft"} color={quiz.status==="graded"?"blue":"gray"}/>
+            {quiz.resultsReleased&&<Badge label="Released" color="green"/>}
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:16}}><Btn primary onClick={gradeAll}>{working?"Working...":"⚡ Auto-Grade All"}</Btn>{quiz.status==="graded"&&!quiz.resultsReleased&&(<button style={{...Sty.btn,background:"#15803d"}} onClick={release} disabled={working}>{working?"Working...":"🚀 Release to Candidates"}</button>)}</div>
+          {quizSubs.length===0&&<Empty text="No submissions yet."/>}
+          {quizSubs.length>0&&(
+            <div style={{border:"1px solid rgba(255,255,255,.06)",borderRadius:12,overflow:"hidden"}}>
+              <div style={{display:"grid",gridTemplateColumns:"2fr 2fr 1fr 1fr 1fr",padding:"10px 16px",background:"rgba(255,255,255,.03)",fontWeight:700,color:"#4b5563",fontSize:11,textTransform:"uppercase",letterSpacing:"1px"}}><div>Candidate</div><div>Submitted</div><div>Score</div><div>Status</div><div>Violations</div></div>
+              {quizSubs.map(s=>{const c=candidates.find(x=>x.id===s.candidate_id);const v=s.violations||[];return(<div key={s.id} style={{display:"grid",gridTemplateColumns:"2fr 2fr 1fr 1fr 1fr",padding:"12px 16px",borderTop:"1px solid rgba(255,255,255,.04)",fontSize:13,color:"#d1d5db",alignItems:"center"}}><div style={{fontWeight:500}}>{c?.name||"—"}</div><div style={{fontSize:12,color:"#4b5563"}}>{fmtDate(s.submitted_at)}</div><div style={{fontWeight:700,color:s.graded?"#a78bfa":"#374151"}}>{s.graded?`${s.score} / ${totalM}`:"—"}</div><div><Badge label={s.graded?"Graded":"Pending"} color={s.graded?"green":"gray"}/></div><div>{v.length>0?<Badge label={`${v.length} ⚠`} color="red"/>:<span style={{color:"#22c55e",fontSize:12}}>✓ Clean</span>}</div></div>);})}
+            </div>
+          )}
+        </>}
+      </>}
+    </PageWrap>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CANDIDATE APP
+// ══════════════════════════════════════════════════════════════════════════════
+function CandidateApp({ user, onLogout }) {
+  const [tab,setTab]=useState("exams"); const [quizzes,setQuizzes]=useState([]); const [subs,setSubs]=useState([]); const [ann,setAnn]=useState([]); const [active,setActive]=useState(null); const [loading,setLoading]=useState(true); const [dismissed,setDismissed]=useState([]);
+  async function load(){setLoading(true);try{const [q,s,a]=await Promise.all([dbGet("quizzes","select=*&status=in.(published,graded)"),dbGet("submissions",`select=*&candidate_id=eq.${user.id}`),dbGet("announcements","select=*&active=eq.true&order=created_at.desc")]);setQuizzes((q||[]).map(x=>({...x,scheduledFor:x.scheduled_for,resultsReleased:x.results_released})));setSubs(s||[]);setAnn(a||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function submitQuiz(quizId,answers,violations){try{await dbInsert("submissions",{id:uid(),quiz_id:quizId,candidate_id:user.id,answers,violations:violations||[]});}catch(e){alert("Submit error: "+e.message);}setActive(null);load();}
+  if(active) return <Attempt quiz={active} user={user} onSubmit={(ans,viols)=>submitQuiz(active.id,ans,viols)}/>;
+  const visibleAnn=ann.filter(a=>!dismissed.includes(a.id));
+  const navItems=[{id:"exams",emoji:"📋",label:"Exams"},{id:"results",emoji:"📊",label:"My Results"},{id:"notices",emoji:"📢",label:`Notices${visibleAnn.length>0?" ("+visibleAnn.length+")":""}`}];
+  return (
+    <div style={{display:"flex",minHeight:"100vh",background:"#07070f"}}>
+      <div style={{width:210,background:"rgba(255,255,255,.02)",borderRight:"1px solid rgba(255,255,255,.05)",display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
+        <div style={{padding:"22px 18px 14px",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
+          <div style={{fontSize:17,fontWeight:900,background:"linear-gradient(135deg,#c4b5fd,#818cf8)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"-1px"}}>EXAMCORE</div>
+          <div style={{fontSize:10,color:"#374151",textTransform:"uppercase",letterSpacing:"1.5px",marginTop:2}}>Candidate</div>
+        </div>
+        <div style={{margin:"10px 12px",background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.15)",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,#8b5cf6,#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff",flexShrink:0}}>{user.name[0]?.toUpperCase()}</div>
+          <div><div style={{fontSize:12,fontWeight:700,color:"#f9fafb",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>{user.name}</div><div style={{fontSize:10,color:"#8b5cf6"}}>@{user.username}</div></div>
+        </div>
+        <nav style={{flex:1,padding:"6px 10px"}}>
+          {navItems.map(n=>(<button key={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 10px",borderRadius:8,background:tab===n.id?"rgba(139,92,246,.15)":"transparent",border:"none",color:tab===n.id?"#c4b5fd":"#6b7280",cursor:"pointer",fontSize:13,fontWeight:tab===n.id?700:400,marginBottom:2,textAlign:"left"}}><span style={{fontSize:16}}>{n.emoji}</span>{n.label}</button>))}
+        </nav>
+        <div style={{padding:"10px 10px",borderTop:"1px solid rgba(255,255,255,.05)"}}><button onClick={onLogout} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 10px",borderRadius:8,background:"transparent",border:"none",color:"#4b5563",cursor:"pointer",fontSize:13}} onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#4b5563"}><span style={{fontSize:16}}>🚪</span> Logout</button></div>
+      </div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid rgba(255,255,255,.05)",padding:"14px 28px",position:"sticky",top:0,zIndex:40,backdropFilter:"blur(10px)"}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#f9fafb"}}>{navItems.find(n=>n.id===tab)?.emoji} {navItems.find(n=>n.id===tab)?.label.split(" (")[0]}</div>
+          <div style={{fontSize:12,color:"#374151",marginTop:1}}>Hello, {user.name}!</div>
+        </div>
+        <div style={{padding:"24px 28px"}}>
+          {loading&&<Loader/>}
+          {!loading&&tab==="exams"&&(
+            <div style={{maxWidth:740}}>
+              {visibleAnn.filter(a=>a.type==="urgent").map(a=>{const t=ANN_TYPES[a.type]||ANN_TYPES.info;return(<div key={a.id} style={{background:t.bg,borderLeft:`3px solid ${t.border}`,borderRadius:10,padding:"12px 16px",marginBottom:12,position:"relative",animation:"slideDown .3s ease"}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}><span style={{fontSize:16}}>{t.icon}</span><span style={{fontWeight:700,color:t.color}}>{a.title}</span></div><div style={{fontSize:13,color:"#d1d5db"}}>{a.message}</div><button onClick={()=>setDismissed(p=>[...p,a.id])} style={{position:"absolute",top:8,right:10,background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>×</button></div>);})}
+              {quizzes.length===0&&<Empty text="No exams available right now."/>}
+              {quizzes.map(q=>{const sub=subs.find(s=>s.quiz_id===q.id);const scheduled=q.scheduledFor?new Date(q.scheduledFor):null;const upcoming=scheduled&&new Date()<scheduled;const totalM=(q.questions||[]).reduce((a,x)=>a+x.marks,0);return(
+                <div key={q.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20,marginBottom:10}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:10}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:"rgba(99,102,241,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📋</div>
+                    <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:"#f9fafb",marginBottom:4}}>{q.title}</div><div style={{fontSize:12,color:"#4b5563",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>{I.clock} {q.duration} min · {(q.questions||[]).length} Qs · {totalM} marks{scheduled&&<> · {fmtDate(q.scheduledFor)}</>}</div></div>
+                  </div>
+                  <div style={{fontSize:11,color:"#374151",marginBottom:10,padding:"6px 10px",background:"rgba(255,255,255,.02)",borderRadius:6"}}>🛡 Anti-cheat monitoring enabled</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>{upcoming&&<Badge label="Not open yet" color="gray"/>}{sub&&!q.resultsReleased&&<Badge label="Submitted — awaiting results" color="blue"/>}{sub&&q.resultsReleased&&<Badge label={`Score: ${sub.score} / ${totalM}`} color="green"/>}{!sub&&!upcoming&&<Btn primary onClick={()=>setActive(q)}>Start Exam →</Btn>}</div>
+                </div>
+              );})}
+            </div>
+          )}
+          {!loading&&tab==="results"&&(
+            <div style={{maxWidth:740}}>
+              {subs.length===0&&<Empty text="No exams attempted yet."/>}
+              {subs.map(s=>{const q=quizzes.find(x=>x.id===s.quiz_id);if(!q)return null;const total=(q.questions||[]).reduce((a,x)=>a+x.marks,0)||1;const v=s.violations||[];const pct=q.resultsReleased?((s.score/total)*100).toFixed(1):0;return(
+                <div key={s.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20,marginBottom:10}}>
+                  <div style={{fontSize:16,fontWeight:700,color:"#f9fafb",marginBottom:4}}>{q.title}</div>
+                  <div style={{fontSize:12,color:"#4b5563",marginBottom:12}}>Submitted: {fmtDate(s.submitted_at)}</div>
+                  {q.resultsReleased?(<>
+                    <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:10}}><span style={{fontSize:48,fontWeight:900,color:"#a78bfa",lineHeight:1}}>{s.score}</span><span style={{fontSize:22,color:"#374151"}}>/ {total}</span><span style={{fontSize:16,color:"#22c55e",fontWeight:700}}>{pct}%</span></div>
+                    <div style={{background:"rgba(255,255,255,.04)",borderRadius:8,height:8,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:`linear-gradient(90deg,${pct>=75?"#22c55e":pct>=50?"#eab308":"#ef4444"},${pct>=75?"#16a34a":pct>=50?"#ca8a04":"#dc2626"})`}}/></div>
+                  </>):<Badge label="Results not released yet" color="gray"/>}
+                  {v.length>0&&<div style={{marginTop:10,fontSize:12,color:"#fca5a5",padding:"5px 10px",background:"rgba(239,68,68,.06)",borderRadius:6}}>⚠ {v.length} violation(s) recorded on your attempt</div>}
+                </div>
+              );})}
+            </div>
+          )}
+          {!loading&&tab==="notices"&&(
+            <div style={{maxWidth:740}}>
+              {ann.length===0&&<Empty text="No announcements right now."/>}
+              {ann.map(a=>{const t=ANN_TYPES[a.type]||ANN_TYPES.info;return(<div key={a.id} style={{borderRadius:14,overflow:"hidden",marginBottom:10}}><div style={{background:t.bg,borderLeft:`3px solid ${t.border}`,padding:"14px 18px"}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}><span style={{fontSize:18}}>{t.icon}</span><span style={{fontWeight:700,color:t.color,fontSize:15}}>{a.title}</span></div><div style={{fontSize:14,color:"#d1d5db",lineHeight:1.7}}>{a.message}</div></div><div style={{padding:"7px 18px",background:"rgba(0,0,0,.2)",fontSize:11,color:"#374151"}}>Posted {fmtDate(a.created_at)}</div></div>);})}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ATTEMPT ───────────────────────────────────────────────────────────────────
+function Attempt({ quiz, user, onSubmit }) {
+  const [cur,setCur]=useState(0); const [answers,setAnswers]=useState({}); const [flags,setFlags]=useState({}); const [visited,setVisited]=useState({0:true}); const [secs,setSecs]=useState(quiz.duration*60); const [confirm,setConfirm]=useState(false); const [submitting,setSubmitting]=useState(false); const [violations,setViolations]=useState([]); const [toast,setToast]=useState(null); const [isFS,setIsFS]=useState(false); const [adminAlerts,setAdminAlerts]=useState([]); const [alertPopup,setAlertPopup]=useState(null);
+  const timerRef=useRef(null); const violRef=useRef([]); const ansRef=useRef({}); const doneRef=useRef(false); const heartbeatRef=useRef(null); const alertPollRef=useRef(null); const sessionIdRef=useRef(uid()); const lastAlertRef=useRef(null);
+  useEffect(()=>{violRef.current=violations;},[violations]);
+  useEffect(()=>{ansRef.current=answers;},[answers]);
+  async function upsertSession(extra={}){try{await sbFetch("POST","exam_sessions?on_conflict=candidate_id,quiz_id","",{id:sessionIdRef.current,candidate_id:user.id,quiz_id:quiz.id,last_seen:new Date().toISOString(),answers_count:Object.keys(ansRef.current).filter(k=>{const a=ansRef.current[k];return a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);}).length,violations_count:violRef.current.length,status:"active",...extra});}catch(e){console.warn(e.message);}}
+  async function pollAlerts(){try{const rows=await dbGet("live_alerts",`select=*&quiz_id=eq.${quiz.id}&order=created_at.desc&limit=10`);const rel=(rows||[]).filter(a=>a.candidate_id===null||a.candidate_id===user.id);if(rel.length>0){const newest=rel[0];if(lastAlertRef.current!==newest.id){lastAlertRef.current=newest.id;setAlertPopup(newest);setAdminAlerts(rel);setTimeout(()=>setAlertPopup(null),8000);}}}catch(e){console.warn(e.message);}}
+  useEffect(()=>{upsertSession();heartbeatRef.current=setInterval(()=>upsertSession(),HEARTBEAT);alertPollRef.current=setInterval(pollAlerts,ALERT_POLL);pollAlerts();return()=>{clearInterval(heartbeatRef.current);clearInterval(alertPollRef.current);};},[]);
+  useEffect(()=>{const el=document.documentElement;const fn=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen;if(fn)fn.call(el).then(()=>setIsFS(true)).catch(()=>{});const chg=()=>{const f=!!(document.fullscreenElement||document.webkitFullscreenElement);setIsFS(f);if(!f&&!doneRef.current)addV("Exited fullscreen");};document.addEventListener("fullscreenchange",chg);document.addEventListener("webkitfullscreenchange",chg);return()=>{document.removeEventListener("fullscreenchange",chg);document.removeEventListener("webkitfullscreenchange",chg);if(document.fullscreenElement)document.exitFullscreen&&document.exitFullscreen();};},[]);
+  useEffect(()=>{const fn=()=>{if(document.hidden&&!doneRef.current)addV("Switched tab");};document.addEventListener("visibilitychange",fn);return()=>document.removeEventListener("visibilitychange",fn);},[]);
+  useEffect(()=>{const fn=()=>{if(!doneRef.current)addV("Window lost focus");};window.addEventListener("blur",fn);return()=>window.removeEventListener("blur",fn);},[]);
+  useEffect(()=>{const fn=e=>{if(e.ctrlKey||e.metaKey||e.key==="F12"||e.key==="PrintScreen"){e.preventDefault();e.stopPropagation();if(!doneRef.current)addV("Blocked key: "+e.key);}};document.addEventListener("keydown",fn,true);return()=>document.removeEventListener("keydown",fn,true);},[]);
+  useEffect(()=>{const cp=e=>{e.preventDefault();if(!doneRef.current)addV("Copy");};const ps=e=>{e.preventDefault();if(!doneRef.current)addV("Paste");};const rc=e=>{e.preventDefault();if(!doneRef.current)addV("Right-click");};document.addEventListener("copy",cp);document.addEventListener("paste",ps);document.addEventListener("contextmenu",rc);return()=>{document.removeEventListener("copy",cp);document.removeEventListener("paste",ps);document.removeEventListener("contextmenu",rc);};},[]);
+  useEffect(()=>{timerRef.current=setInterval(()=>{setSecs(s=>{if(s<=1){clearInterval(timerRef.current);doSubmit("Time expired");return 0;}return s-1;});},1000);return()=>clearInterval(timerRef.current);},[]);
+  function addV(type){if(doneRef.current)return;const v={type,time:new Date().toISOString()};const upd=[...violRef.current,v];violRef.current=upd;setViolations(upd);setToast({msg:type,count:upd.length,left:MAX_WARN-upd.length});setTimeout(()=>setToast(null),4000);if(upd.length>=MAX_WARN)doSubmit("Auto-submitted: too many violations");}
+  async function doSubmit(reason){if(doneRef.current)return;doneRef.current=true;clearInterval(timerRef.current);clearInterval(heartbeatRef.current);clearInterval(alertPollRef.current);setSubmitting(true);await upsertSession({status:"submitted"});const v=reason?[...violRef.current,{type:reason,time:new Date().toISOString()}]:violRef.current;await onSubmit(ansRef.current,v);setSubmitting(false);}
+  function reFS(){const el=document.documentElement;const fn=el.requestFullscreen||el.webkitRequestFullscreen;if(fn)fn.call(el).then(()=>setIsFS(true)).catch(()=>{});}
+  const questions=quiz.questions||[]; const q=questions[cur]; const mm=String(Math.floor(secs/60)).padStart(2,"0"); const ss=String(secs%60).padStart(2,"0"); const urgent=secs<300;
+  function go(i){setCur(i);setVisited(v=>({...v,[i]:true}));}
+  function ans(val){if(q.type==="mcq_multi"){const p=Array.isArray(answers[q.id])?answers[q.id]:[];setAnswers(a=>({...a,[q.id]:p.includes(val)?p.filter(x=>x!==val):[...p,val]}));}else setAnswers(a=>({...a,[q.id]:val}));}
+  function clearAns(){setAnswers(a=>{const n={...a};delete n[q.id];return n;});}
+  function qSt(i){const qi=questions[i];const a=answers[qi.id];const has=a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);const fl=flags[qi.id];if(fl&&has)return"fa";if(fl)return"f";if(has)return"a";if(visited[i])return"v";return"n";}
+  const SC={n:"#1f2937",v:"#7f1d1d",a:"#14532d",f:"#78350f",fa:"#581c87"};
+  const answered=questions.filter((_,i)=>{const a=answers[questions[i].id];return a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);}).length;
+  const AC={warning:{bg:"rgba(234,179,8,.15)",border:"rgba(234,179,8,.5)",color:"#eab308",icon:"⚠️"},urgent:{bg:"rgba(239,68,68,.15)",border:"rgba(239,68,68,.5)",color:"#ef4444",icon:"🚨"},info:{bg:"rgba(99,102,241,.15)",border:"rgba(99,102,241,.5)",color:"#a78bfa",icon:"ℹ️"}};
+  if(!q) return <div style={{padding:40,color:"#f9fafb"}}>No questions found.</div>;
+  return (
+    <div className="exam-mode" style={{display:"flex",flexDirection:"column",minHeight:"100vh",background:"#07070f",color:"#e5e7eb"}}>
+      {toast&&(<div style={{position:"fixed",top:72,left:"50%",transform:"translateX(-50%)",zIndex:1000,background:"#1a0505",border:"1px solid rgba(239,68,68,.5)",borderRadius:12,padding:"12px 20px",minWidth:300,boxShadow:"0 0 40px rgba(239,68,68,.3)",animation:"shake .4s ease"}}><div style={{color:"#fca5a5",fontWeight:700,fontSize:14,marginBottom:3}}>⚠ {toast.msg}</div><div style={{color:"#ef4444",fontSize:13,fontWeight:700}}>Warning {toast.count}/{MAX_WARN} — {toast.left} more = auto-submit</div></div>)}
+      {alertPopup&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:1999}}/>}
+      {alertPopup&&(()=>{const ac=AC[alertPopup.type]||AC.info;return(<div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:2000,background:"#0d0d1a",border:`2px solid ${ac.border}`,borderRadius:18,padding:30,maxWidth:380,width:"90%",boxShadow:`0 0 60px ${ac.border}`,animation:"popIn .3s ease"}}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:40,marginBottom:8}}>{ac.icon}</div><div style={{fontSize:18,fontWeight:800,color:ac.color}}>Message from Admin</div></div><div style={{background:ac.bg,border:`1px solid ${ac.border}`,borderRadius:10,padding:"14px 16px",marginBottom:16,fontSize:15,color:"#f9fafb",lineHeight:1.7,textAlign:"center"}}>{alertPopup.message}</div><button onClick={()=>setAlertPopup(null)} style={{width:"100%",background:ac.border,border:"none",borderRadius:8,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Got it</button></div>);})()}
+      {!isFS&&(<div style={{background:"rgba(220,38,38,.12)",borderBottom:"1px solid rgba(220,38,38,.25)",padding:"6px 20px",display:"flex",alignItems:"center",gap:10,fontSize:13}}><span style={{color:"#fca5a5"}}>⚠ Not in fullscreen.</span><button onClick={reFS} style={{background:"#dc2626",border:"none",borderRadius:5,padding:"3px 10px",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>Go Fullscreen</button></div>)}
+      <div style={{display:"flex",alignItems:"center",padding:"10px 20px",background:"rgba(0,0,0,.6)",borderBottom:"1px solid rgba(255,255,255,.06)",gap:14,position:"sticky",top:0,zIndex:50,backdropFilter:"blur(10px)"}}>
+        <div style={{flex:1,fontWeight:700,fontSize:15,color:"#f9fafb"}}>{quiz.title}</div>
+        <div style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#22c55e"}}><div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",animation:"pulse 2s infinite"}}/>Live</div>
+        {violations.length>0&&<div style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",borderRadius:6,padding:"4px 10px",fontSize:12,color:"#fca5a5"}}>⚠ {violations.length}</div>}
+        <div style={{background:urgent?"rgba(220,38,38,.15)":"rgba(99,102,241,.12)",border:`1px solid ${urgent?"rgba(220,38,38,.35)":"rgba(99,102,241,.25)"}`,borderRadius:8,padding:"6px 14px",fontSize:18,fontWeight:800,color:urgent?"#ef4444":"#a78bfa",display:"flex",alignItems:"center",gap:5}}>{I.clock} {mm}:{ss}</div>
+        <button style={{...Sty.btn,background:"#dc2626",padding:"8px 16px"}} onClick={()=>setConfirm(true)}>Submit</button>
+      </div>
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        <div style={{flex:1,padding:"28px 36px",overflowY:"auto"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,color:"#4b5563",fontWeight:700}}>Q{cur+1} / {questions.length}</span>
+            <span style={{background:"rgba(99,102,241,.12)",color:"#a78bfa",fontSize:11,padding:"3px 10px",borderRadius:10,fontWeight:700}}>{q.type==="mcq"?"Single Correct":q.type==="mcq_multi"?"Multiple Correct":"Numerical"}</span>
+            <span style={{fontSize:13,color:"#22c55e",fontWeight:700}}>+{q.marks}</span>
+            <span style={{fontSize:13,color:"#ef4444",fontWeight:700}}>-{q.negMarks||0}</span>
+          </div>
+          <div style={{fontSize:17,color:"#f9fafb",lineHeight:1.8,marginBottom:28}}>{q.text}</div>
+          {(q.type==="mcq"||q.type==="mcq_multi")&&(<div style={{display:"flex",flexDirection:"column",gap:10}}>{q.options.map((o,i)=>{const sel=q.type==="mcq_multi"?(Array.isArray(answers[q.id])&&answers[q.id].includes(i)):answers[q.id]===i;return(<button key={i} onClick={()=>ans(i)} style={{display:"flex",alignItems:"center",gap:14,background:sel?"rgba(99,102,241,.15)":"rgba(255,255,255,.03)",border:`1px solid ${sel?"rgba(99,102,241,.4)":"rgba(255,255,255,.07)"}`,borderRadius:10,padding:"13px 18px",cursor:"pointer",textAlign:"left",fontSize:15,color:sel?"#a78bfa":"#e5e7eb",width:"100%",transition:"all .15s"}}><span style={{width:30,height:30,borderRadius:"50%",background:sel?"rgba(99,102,241,.3)":"rgba(255,255,255,.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,color:sel?"#a78bfa":"#6b7280"}}>{String.fromCharCode(65+i)}</span><span>{o||<em style={{color:"#374151"}}>Option {String.fromCharCode(65+i)}</em>}</span></button>);})}</div>)}
+          {q.type==="numerical"&&<input style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"13px 18px",color:"#f9fafb",fontSize:22,fontWeight:700,outline:"none",width:220,fontFamily:"monospace"}} type="number" placeholder="Your answer" value={answers[q.id]??""} onChange={e=>ans(e.target.value)}/>}
+          {adminAlerts.length>0&&(<div style={{marginTop:24,borderTop:"1px solid rgba(255,255,255,.05)",paddingTop:16}}><div style={{fontSize:11,color:"#374151",textTransform:"uppercase",letterSpacing:"1px",marginBottom:8,fontWeight:700}}>Admin Messages</div>{adminAlerts.slice(0,3).map(a=>{const ac=AC[a.type]||AC.info;return(<div key={a.id} style={{background:ac.bg,border:`1px solid ${ac.border}`,borderRadius:7,padding:"8px 12px",marginBottom:5,display:"flex",alignItems:"center",gap:8}}><span>{ac.icon}</span><span style={{fontSize:12,color:ac.color,fontWeight:600}}>{a.message}</span><span style={{fontSize:10,color:"#374151",marginLeft:"auto"}}>{timeAgo(a.created_at)}</span></div>);})}</div>)}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:24,flexWrap:"wrap"}}>
+            <button style={{background:"none",border:"1px solid rgba(255,255,255,.08)",borderRadius:7,padding:"7px 14px",color:"#4b5563",cursor:"pointer",fontSize:13}} onClick={clearAns}>Clear</button>
+            <button onClick={()=>setFlags(f=>({...f,[q.id]:!f[q.id]}))} style={{background:flags[q.id]?"rgba(180,83,9,.2)":"rgba(180,83,9,.08)",border:`1px solid ${flags[q.id]?"rgba(180,83,9,.4)":"rgba(180,83,9,.15)"}`,borderRadius:7,padding:"7px 14px",color:"#d97706",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",gap:5}}>{I.flag} {flags[q.id]?"Unflag":"Flag"}</button>
+            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+              <button disabled={cur===0} onClick={()=>go(cur-1)} style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.15)",borderRadius:7,padding:"7px 16px",color:"#a78bfa",cursor:"pointer",fontSize:13,fontWeight:600}}>← Prev</button>
+              <button disabled={cur===questions.length-1} onClick={()=>go(cur+1)} style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.15)",borderRadius:7,padding:"7px 16px",color:"#a78bfa",cursor:"pointer",fontSize:13,fontWeight:600}}>Next →</button>
+            </div>
+          </div>
+        </div>
+        <div style={{width:210,background:"rgba(0,0,0,.3)",borderLeft:"1px solid rgba(255,255,255,.05)",padding:14,overflowY:"auto",flexShrink:0}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:10}}>Palette</div>
+          <div style={{display:"flex",flexDirection:"column",gap:3,marginBottom:12}}>{[["Answered","#14532d"],["Not Visited","#7f1d1d"],["Flagged","#78350f"],["Flag+Ans","#581c87"],["Unattempted","#1f2937"]].map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#374151"}}><div style={{width:9,height:9,borderRadius:3,background:v,flexShrink:0}}/>{k}</div>))}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:4,marginBottom:12}}>{questions.map((_,i)=>(<button key={i} onClick={()=>go(i)} style={{width:32,height:32,borderRadius:6,border:i===cur?"2px solid #a78bfa":"1px solid rgba(255,255,255,.08)",background:SC[qSt(i)],color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}</div>
+          <div style={{fontSize:12,marginBottom:12}}>
+            <div style={{color:"#22c55e",marginBottom:3}}>✓ {answered} answered</div>
+            <div style={{color:"#ef4444",marginBottom:3}}>✗ {questions.length-answered} left</div>
+            {violations.length>0&&<div style={{color:"#fca5a5"}}>⚠ {violations.length} violation{violations.length>1?"s":""}</div>}
+          </div>
+          <button style={{...Sty.btn,width:"100%",justifyContent:"center",background:"#dc2626",marginBottom:6,padding:"8px"}} onClick={()=>setConfirm(true)}>Submit Exam</button>
+          {!isFS&&<button onClick={reFS} style={{width:"100%",background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.15)",borderRadius:7,padding:"7px",color:"#a78bfa",cursor:"pointer",fontSize:12,fontWeight:600}}>↑ Fullscreen</button>}
+        </div>
+      </div>
+      {confirm&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}><div style={{background:"#0f0f1c",border:"1px solid rgba(255,255,255,.08)",borderRadius:18,padding:32,maxWidth:360,width:"90%",animation:"popIn .2s ease"}}><div style={{fontSize:20,fontWeight:800,color:"#f9fafb",marginBottom:10}}>Submit Exam?</div><div style={{color:"#6b7280",lineHeight:2,marginBottom:16}}>Answered: <strong style={{color:"#22c55e"}}>{answered}</strong> · Remaining: <strong style={{color:"#ef4444"}}>{questions.length-answered}</strong><br/>{violations.length>0&&<span style={{color:"#fca5a5"}}>⚠ {violations.length} violation(s) will be reported.<br/></span>}You cannot change answers after submitting.</div><div style={{display:"flex",gap:10,justifyContent:"flex-end"}}><Btn ghost onClick={()=>setConfirm(false)}>Continue</Btn><button style={{...Sty.btn,background:"#dc2626"}} disabled={submitting} onClick={()=>doSubmit(null)}>{submitting?"Submitting...":"Submit Now"}</button></div></div></div>)}
+    </div>
+  );
+}
+
+// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
+function PageWrap({ title, subtitle, action, children }) {
+  return (
+    <div style={{maxWidth:960,animation:"fadeIn .25s ease"}}>
+      {(title||action)&&(
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:24}}>
+          <div><div style={{fontSize:20,fontWeight:800,color:"#f9fafb"}}>{title}</div>{subtitle&&<div style={{fontSize:13,color:"#374151",marginTop:2}}>{subtitle}</div>}</div>
+          {action&&<div>{action}</div>}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+function Field({ label, children }) { return <div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,color:"#4b5563",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontWeight:700}}>{label}</label>{children}</div>; }
+function Grid2({ children }) { return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{children}</div>; }
+function SectionLabel({ children }) { return <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"1px",marginBottom:10,marginTop:8}}>{children}</div>; }
+function Empty({ text }) { return <div style={{color:"#374151",fontSize:14,padding:"28px 0",textAlign:"center",border:"1px dashed rgba(255,255,255,.06)",borderRadius:10}}>{text}</div>; }
+function Loader() { return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 0",gap:10,color:"#374151",fontSize:13}}><div style={{width:18,height:18,border:"2px solid rgba(99,102,241,.2)",borderTop:"2px solid #a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>Loading...</div>; }
+function Badge({ label, color="gray" }) {
+  const c={green:["rgba(34,197,94,.12)","#22c55e"],blue:["rgba(96,165,250,.12)","#60a5fa"],gray:["rgba(107,114,128,.15)","#6b7280"],red:["rgba(239,68,68,.12)","#ef4444"],yellow:["rgba(234,179,8,.12)","#eab308"],purple:["rgba(168,85,247,.12)","#a78bfa"]}[color]||["rgba(107,114,128,.15)","#6b7280"];
+  return <span style={{background:c[0],color:c[1],borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;
+}
+function Btn({ children, onClick, primary, ghost, danger, disabled }) {
+  let bg="rgba(255,255,255,.04)", border="1px solid rgba(255,255,255,.08)", color="#6b7280";
+  if(primary){bg="linear-gradient(135deg,#6366f1,#8b5cf6)";border="none";color="#fff";}
+  if(danger) {bg="rgba(239,68,68,.08)"; border="1px solid rgba(239,68,68,.15)"; color="#ef4444";}
+  return <button disabled={disabled} style={{background:bg,border,borderRadius:7,padding:"8px 14px",color,fontWeight:600,fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,transition:"all .15s"}} onClick={onClick}>{children}</button>;
+}
+
+const Sty = {
+  btn:     {background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",borderRadius:8,padding:"9px 18px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6},
+  btnGhost:{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:7,padding:"8px 14px",color:"#6b7280",fontWeight:600,fontSize:13,cursor:"pointer"},
+  inp:     {width:"100%",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"10px 12px",color:"#f9fafb",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"},
+  chip:    {background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:20,padding:"7px 14px",color:"#6b7280",cursor:"pointer",fontSize:13,display:"inline-flex",alignItems:"center",transition:"all .15s"},
+  chipOn:  {background:"rgba(99,102,241,.15)",borderColor:"rgba(99,102,241,.35)",color:"#a78bfa"},
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
