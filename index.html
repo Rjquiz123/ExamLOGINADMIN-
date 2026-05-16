@@ -267,4 +267,459 @@ function Overview({onNav}) {
             <div style={{fontSize:10,color:"#4b5563",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:8}}>{s.l}</div>
             <div style={{fontSize:34,fontWeight:900,color:s.c,lineHeight:1,marginBottom:4}}>{s.v}</div>
             <div style={{fontSize:11,color:"#374151"}}>{s.sub}</div>
-            <div style={{position:"absolute",bot
+            <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:"linear-gradient(90deg,"+s.c+"40,"+s.c+")"}}/>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+        {/* QUICK ACTIONS */}
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:18}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#f9fafb",marginBottom:12}}>⚡ Quick Actions</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {actions.map(a=>(
+              <button key={a.l} onClick={()=>onNav(a.t)}
+                onMouseEnter={e=>e.currentTarget.style.background=a.c+"22"}
+                onMouseLeave={e=>e.currentTarget.style.background=a.c+"10"}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:a.c+"10",border:"1px solid "+a.c+"25",borderRadius:10,cursor:"pointer",color:a.c,fontSize:12,fontWeight:600,textAlign:"left",transition:"background .15s"}}>
+                <span style={{fontSize:15}}>{a.i}</span>{a.l}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* RECENT SUBMISSIONS */}
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:18}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#f9fafb",marginBottom:12}}>📝 Recent Submissions</div>
+          {recentSubs.length===0&&<div style={{color:"#374151",fontSize:13,textAlign:"center",padding:"12px 0"}}>No submissions yet.</div>}
+          {recentSubs.map((s,i)=>(
+            <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<recentSubs.length-1?"1px solid rgba(255,255,255,.04)":"none"}}>
+              <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(99,102,241,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#a78bfa",flexShrink:0}}>{i+1}</div>
+              <div style={{flex:1}}><div style={{fontSize:12,color:"#e5e7eb",fontWeight:600}}>Candidate ...{s.candidate_id?.slice(-4)}</div><div style={{fontSize:10,color:"#374151"}}>{timeAgo(s.submitted_at)}</div></div>
+              <Badge label={s.graded?"Graded":"Pending"} color={s.graded?"green":"gray"}/>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* RECENT QUIZZES */}
+      <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:18}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#f9fafb"}}>📋 Recent Quizzes</div>
+          <button onClick={()=>onNav("quizzes")} style={{background:"none",border:"none",color:"#6366f1",cursor:"pointer",fontSize:12,fontWeight:600}}>View all →</button>
+        </div>
+        {stats.recentQ.length===0&&<div style={{color:"#374151",fontSize:13,textAlign:"center",padding:"10px 0"}}>No quizzes yet.</div>}
+        {stats.recentQ.map(q=>(
+          <div key={q.id} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+            <div style={{width:34,height:34,borderRadius:9,background:"rgba(99,102,241,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>📋</div>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#f9fafb"}}>{q.title}</div><div style={{fontSize:11,color:"#374151"}}>{fmtShort(q.created_at)}</div></div>
+            <Badge label={q.status||"draft"} color={q.status==="published"?"green":q.status==="graded"?"blue":"gray"}/>
+            {q.results_released&&<Badge label="Released" color="green"/>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── QUIZ MANAGER ──────────────────────────────────────────────────────────────
+function QuizManager() {
+  const [quizzes,setQuizzes]=useState([]); const [editing,setEditing]=useState(null); const [loading,setLoading]=useState(true);
+  async function load(){setLoading(true);try{const d=await dbGet("quizzes","select=*&order=created_at.desc");setQuizzes((d||[]).map(q=>({...q,scheduledFor:q.scheduled_for,resultsReleased:q.results_released})));}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function saveQuiz(form){const p={title:form.title,duration:form.duration,scheduled_for:form.scheduledFor||null,status:form.status,questions:form.questions||[]};try{if(form.id)await dbUpdate("quizzes",{id:form.id},p);else await dbInsert("quizzes",{...p,id:uid(),results_released:false});await load();}catch(e){alert("Error: "+e.message);}setEditing(null);}
+  async function del(id){try{await dbDelete("quizzes",{id});setQuizzes(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  if(editing!==null) return <QuizEditor quiz={editing.id?editing:null} onSave={saveQuiz} onCancel={()=>setEditing(null)}/>;
+  return (
+    <Page title="Quizzes" sub="Create and manage exams" action={<Btn primary onClick={()=>setEditing({})}>{Ico.plus} New Quiz</Btn>}>
+      {loading&&<Loader/>}
+      {!loading&&quizzes.length===0&&<Empty text="No quizzes yet. Create your first one."/>}
+      {quizzes.map(q=>(
+        <div key={q.id} style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:"13px 16px",marginBottom:8}}>
+          <div style={{width:38,height:38,borderRadius:10,background:"rgba(99,102,241,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,marginRight:14}}>📋</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:600,color:"#f9fafb",marginBottom:4}}>{q.title}</div>
+            <div style={{fontSize:12,color:"#4b5563",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              {Ico.clock} {q.duration} min · {q.questions?.length||0} Qs · {q.scheduledFor?fmtDate(q.scheduledFor):"No schedule"}
+              <Badge label={q.status||"draft"} color={q.status==="published"?"green":q.status==="graded"?"blue":"gray"}/>
+              {q.resultsReleased&&<Badge label="Released" color="green"/>}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6}}><Btn onClick={()=>setEditing(q)}>{Ico.edit}</Btn><Btn danger onClick={()=>del(q.id)}>{Ico.trash}</Btn></div>
+        </div>
+      ))}
+    </Page>
+  );
+}
+
+function QuizEditor({quiz,onSave,onCancel}) {
+  const blankQ=()=>({type:"mcq",text:"",options:["","","",""],correct:0,marks:4,negMarks:1});
+  const [form,setForm]=useState(quiz||{title:"",duration:60,scheduledFor:"",status:"draft",questions:[]});
+  const [adding,setAdding]=useState(false); const [nq,setNq]=useState(blankQ()); const [saving,setSaving]=useState(false);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  function saveQ(){if(!nq.text.trim())return;setForm(p=>({...p,questions:[...p.questions,{...nq,id:uid()}]}));setNq(blankQ());setAdding(false);}
+  async function handleSave(){if(!form.title.trim())return;setSaving(true);await onSave(form);setSaving(false);}
+  return (
+    <Page title={quiz?"Edit Quiz":"New Quiz"} action={<div style={{display:"flex",gap:8}}><Btn ghost onClick={onCancel}>Cancel</Btn><Btn primary onClick={handleSave}>{saving?"Saving...":"Save Quiz"}</Btn></div>}>
+      <G2><Fld label="Title"><input style={C.inp} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Quiz title"/></Fld><Fld label="Duration (min)"><input style={C.inp} type="number" value={form.duration} onChange={e=>f("duration",+e.target.value)}/></Fld><Fld label="Schedule"><input style={C.inp} type="datetime-local" value={form.scheduledFor||""} onChange={e=>f("scheduledFor",e.target.value)}/></Fld><Fld label="Status"><select style={C.inp} value={form.status} onChange={e=>f("status",e.target.value)}><option value="draft">Draft (hidden)</option><option value="published">Published</option></select></Fld></G2>
+      <SL>Questions ({form.questions.length})</SL>
+      {form.questions.map((q,i)=>(<div key={q.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.05)",borderRadius:8,padding:"10px 12px",marginBottom:6}}><span style={{background:"rgba(99,102,241,.2)",color:"#a78bfa",fontSize:10,fontWeight:800,padding:"2px 6px",borderRadius:4}}>{q.type==="mcq"?"MCQ":q.type==="mcq_multi"?"MULTI":"NUM"}</span><span style={{flex:1,fontSize:13,color:"#e5e7eb"}}>Q{i+1}: {q.text}</span><span style={{fontSize:12,color:"#22c55e"}}>+{q.marks}</span><span style={{fontSize:12,color:"#ef4444"}}>-{q.negMarks}</span><Btn danger onClick={()=>setForm(p=>({...p,questions:p.questions.filter(x=>x.id!==q.id)}))}>{Ico.trash}</Btn></div>))}
+      {!adding&&<button style={{...C.btnGhost,marginTop:8}} onClick={()=>setAdding(true)}>{Ico.plus} Add Question</button>}
+      {adding&&(<div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:10,padding:18,marginTop:12}}>
+        <Fld label="Type"><select style={C.inp} value={nq.type} onChange={e=>setNq(q=>({...q,type:e.target.value,correct:e.target.value==="mcq_multi"?[]:0}))}><option value="mcq">MCQ – Single Correct</option><option value="mcq_multi">MCQ – Multiple Correct</option><option value="numerical">Numerical</option></select></Fld>
+        <Fld label="Question"><textarea style={{...C.inp,minHeight:70}} value={nq.text} onChange={e=>setNq(q=>({...q,text:e.target.value}))} placeholder="Question..."/></Fld>
+        {(nq.type==="mcq"||nq.type==="mcq_multi")&&nq.options.map((o,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>{nq.type==="mcq"?<input type="radio" checked={nq.correct===i} onChange={()=>setNq(q=>({...q,correct:i}))}/>:<input type="checkbox" checked={Array.isArray(nq.correct)&&nq.correct.includes(i)} onChange={()=>{const c=Array.isArray(nq.correct)?nq.correct:[];setNq(q=>({...q,correct:c.includes(i)?c.filter(x=>x!==i):[...c,i]}));}}/>}<span style={{color:"#4b5563",fontSize:13,width:18}}>{String.fromCharCode(65+i)}.</span><input style={{...C.inp,flex:1}} value={o} onChange={e=>{const opts=[...nq.options];opts[i]=e.target.value;setNq(q=>({...q,options:opts}));}} placeholder={"Option "+String.fromCharCode(65+i)}/></div>))}
+        {nq.type==="numerical"&&<Fld label="Correct Answer"><input style={C.inp} value={nq.answer||""} onChange={e=>setNq(q=>({...q,answer:e.target.value}))} placeholder="Exact number"/></Fld>}
+        <G2><Fld label="Marks (+)"><input style={C.inp} type="number" value={nq.marks} onChange={e=>setNq(q=>({...q,marks:+e.target.value}))}/></Fld><Fld label="Neg Marks (-)"><input style={C.inp} type="number" value={nq.negMarks} onChange={e=>setNq(q=>({...q,negMarks:+e.target.value}))}/></Fld></G2>
+        <div style={{display:"flex",gap:8}}><Btn primary onClick={saveQ}>Add Question</Btn><Btn ghost onClick={()=>setAdding(false)}>Cancel</Btn></div>
+      </div>)}
+    </Page>
+  );
+}
+
+// ── CANDIDATE MANAGER ─────────────────────────────────────────────────────────
+function CandidateManager() {
+  const [candidates,setCandidates]=useState([]); const [form,setForm]=useState({name:"",username:"",password:"",email:""}); const [msg,setMsg]=useState(null); const [loading,setLoading]=useState(true);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  async function load(){setLoading(true);try{const d=await dbGet("candidates","select=id,name,username,email,created_at&order=created_at.desc");setCandidates(d||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function add(){
+    if(!form.name||!form.username||!form.password){setMsg({ok:false,text:"Name, username & password required."});return;}
+    try{const ex=await dbGet("candidates","select=id&username=eq."+encodeURIComponent(form.username));if(ex?.length>0){setMsg({ok:false,text:"Username exists."});return;}await dbInsert("candidates",{id:uid(),name:form.name,username:form.username,password:form.password,email:form.email||null});setForm({name:"",username:"",password:"",email:""});setMsg({ok:true,text:"Candidate added."});setTimeout(()=>setMsg(null),2500);load();}
+    catch(e){setMsg({ok:false,text:"Error: "+e.message});}
+  }
+  async function del(id){try{await dbDelete("candidates",{id});setCandidates(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  return (
+    <Page title="Candidates" sub="Manage registered candidates">
+      <div style={{background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.12)",borderRadius:14,padding:18,marginBottom:22}}>
+        <SL>Add New Candidate</SL>
+        <G2><Fld label="Full Name *"><input style={C.inp} value={form.name} onChange={e=>f("name",e.target.value)} placeholder="Full name"/></Fld><Fld label="Username *"><input style={C.inp} value={form.username} onChange={e=>f("username",e.target.value)} placeholder="Username"/></Fld><Fld label="Password *"><input style={C.inp} value={form.password} onChange={e=>f("password",e.target.value)} placeholder="Password"/></Fld><Fld label="Email"><input style={C.inp} value={form.email} onChange={e=>f("email",e.target.value)} placeholder="Optional"/></Fld></G2>
+        {msg&&<div style={{fontSize:13,marginBottom:8,color:msg.ok?"#22c55e":"#ef4444",padding:"6px 10px",background:msg.ok?"rgba(34,197,94,.08)":"rgba(239,68,68,.08)",borderRadius:6}}>{msg.text}</div>}
+        <Btn primary onClick={add}>{Ico.plus} Add Candidate</Btn>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <SL>All Candidates</SL>
+        <span style={{fontSize:12,color:"#4b5563",background:"rgba(255,255,255,.04)",padding:"3px 10px",borderRadius:20,fontWeight:700}}>{candidates.length} total</span>
+      </div>
+      {loading&&<Loader/>}{!loading&&candidates.length===0&&<Empty text="No candidates yet."/>}
+      {candidates.map(c=>(
+        <div key={c.id} style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:"12px 16px",marginBottom:8}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#fff",flexShrink:0,marginRight:12}}>{c.name[0]?.toUpperCase()||"?"}</div>
+          <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#f9fafb"}}>{c.name}</div><div style={{fontSize:12,color:"#4b5563"}}>@{c.username}{c.email?" · "+c.email:""}</div></div>
+          <span style={{fontSize:11,color:"#374151",marginRight:10}}>{fmtShort(c.created_at)}</span>
+          <Btn danger onClick={()=>del(c.id)}>{Ico.trash}</Btn>
+        </div>
+      ))}
+    </Page>
+  );
+}
+
+// ── RESULTS MANAGER ───────────────────────────────────────────────────────────
+function ResultsManager() {
+  const [quizzes,setQuizzes]=useState([]); const [candidates,setCandidates]=useState([]); const [subs,setSubs]=useState([]); const [sel,setSel]=useState(null); const [loading,setLoading]=useState(true); const [working,setWorking]=useState(false);
+  async function load(){setLoading(true);try{const [q,c,s]=await Promise.all([dbGet("quizzes","select=*&order=created_at.desc"),dbGet("candidates","select=id,name,username"),dbGet("submissions","select=*&order=submitted_at.desc")]);setQuizzes((q||[]).map(x=>({...x,scheduledFor:x.scheduled_for,resultsReleased:x.results_released})));setCandidates(c||[]);setSubs(s||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  const quiz=quizzes.find(q=>q.id===sel); const qSubs=subs.filter(s=>s.quiz_id===sel); const totalM=quiz?(quiz.questions||[]).reduce((a,q)=>a+q.marks,0):0;
+  function gradeOne(sub,qs){const ans=sub.answers||{};let sc=0;for(const q of qs){const a=ans[q.id];if(a===undefined||a===null||a==="")continue;if(q.type==="mcq"){if(+a===q.correct)sc+=q.marks;else sc-=(q.negMarks||0);}else if(q.type==="mcq_multi"){const cor=[...(Array.isArray(q.correct)?q.correct:[q.correct])].sort().join(",");const giv=[...(Array.isArray(a)?a:[a])].sort().join(",");if(cor===giv)sc+=q.marks;else sc-=(q.negMarks||0);}else{if(String(a).trim()===String(q.answer).trim())sc+=q.marks;else sc-=(q.negMarks||0);}}return Math.max(0,sc);}
+  async function gradeAll(){if(!quiz)return;setWorking(true);try{for(const s of qSubs){const sc=gradeOne(s,quiz.questions||[]);await dbUpdate("submissions",{id:s.id},{score:sc,graded:true});}await dbUpdate("quizzes",{id:sel},{status:"graded"});await load();}catch(e){alert(e.message);}setWorking(false);}
+  async function release(){setWorking(true);try{await dbUpdate("quizzes",{id:sel},{results_released:true});await load();}catch(e){alert(e.message);}setWorking(false);}
+  return (
+    <Page title="Results & Grading" sub="Grade and release scores">
+      {loading&&<Loader/>}
+      {!loading&&<>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>{quizzes.length===0&&<Empty text="No quizzes yet."/>}{quizzes.map(q=>(<button key={q.id} style={{...C.chip,...(sel===q.id?C.chipOn:{})}} onClick={()=>setSel(q.id)}>{q.title}<span style={{background:"rgba(255,255,255,.08)",borderRadius:10,padding:"1px 7px",fontSize:11,marginLeft:6}}>{subs.filter(s=>s.quiz_id===q.id).length}</span></button>))}</div>
+        {quiz&&<>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap",padding:"11px 16px",background:"rgba(255,255,255,.02)",borderRadius:12,border:"1px solid rgba(255,255,255,.06)"}}><span style={{fontWeight:700,color:"#f9fafb",flex:1}}>{quiz.title}</span><span style={{color:"#4b5563",fontSize:13}}>Total: {totalM} marks</span><Badge label={quiz.status||"draft"} color={quiz.status==="graded"?"blue":"gray"}/>{quiz.resultsReleased&&<Badge label="Released" color="green"/>}</div>
+          <div style={{display:"flex",gap:8,marginBottom:16}}><Btn primary onClick={gradeAll}>{working?"Working...":"⚡ Auto-Grade All"}</Btn>{quiz.status==="graded"&&!quiz.resultsReleased&&(<button style={{...C.btn,background:"#15803d"}} onClick={release} disabled={working}>{working?"Working...":"🚀 Release to Candidates"}</button>)}</div>
+          {qSubs.length===0&&<Empty text="No submissions yet."/>}
+          {qSubs.length>0&&(<div style={{border:"1px solid rgba(255,255,255,.06)",borderRadius:12,overflow:"hidden"}}><div style={{display:"grid",gridTemplateColumns:"2fr 2fr 1fr 1fr 1fr",padding:"10px 16px",background:"rgba(255,255,255,.03)",fontWeight:700,color:"#4b5563",fontSize:11,textTransform:"uppercase",letterSpacing:"1px"}}><div>Candidate</div><div>Submitted</div><div>Score</div><div>Status</div><div>Violations</div></div>{qSubs.map(s=>{const cand=candidates.find(x=>x.id===s.candidate_id);const v=s.violations||[];return(<div key={s.id} style={{display:"grid",gridTemplateColumns:"2fr 2fr 1fr 1fr 1fr",padding:"11px 16px",borderTop:"1px solid rgba(255,255,255,.04)",fontSize:13,color:"#d1d5db",alignItems:"center"}}><div style={{fontWeight:500}}>{cand?.name||"—"}</div><div style={{fontSize:12,color:"#4b5563"}}>{fmtDate(s.submitted_at)}</div><div style={{fontWeight:700,color:s.graded?"#a78bfa":"#374151"}}>{s.graded?s.score+" / "+totalM:"—"}</div><div><Badge label={s.graded?"Graded":"Pending"} color={s.graded?"green":"gray"}/></div><div>{v.length>0?<Badge label={v.length+" ⚠"} color="red"/>:<span style={{color:"#22c55e",fontSize:12}}>✓ Clean</span>}</div></div>);})}</div>)}
+        </>}
+      </>}
+    </Page>
+  );
+}
+
+// ── LIVE MONITOR ──────────────────────────────────────────────────────────────
+function LiveMonitor() {
+  const [quizzes,setQuizzes]=useState([]); const [sel,setSel]=useState(null); const [sessions,setSessions]=useState([]); const [candidates,setCandidates]=useState([]); const [alerts,setAlerts]=useState([]); const [loading,setLoading]=useState(true); const [alertMsg,setAlertMsg]=useState(""); const [alertType,setAlertType]=useState("warning"); const [target,setTarget]=useState("all"); const [sending,setSending]=useState(false); const [lastRef,setLastRef]=useState(null);
+  const ref=useRef(null);
+  async function loadQ(){try{const [q,c]=await Promise.all([dbGet("quizzes","select=*&status=in.(published,graded)&order=created_at.desc"),dbGet("candidates","select=id,name,username")]);setQuizzes(q||[]);setCandidates(c||[]);}catch(e){console.error(e);}setLoading(false);}
+  async function refresh(){if(!sel)return;try{const [s,a]=await Promise.all([dbGet("exam_sessions","select=*&quiz_id=eq."+sel+"&order=last_seen.desc"),dbGet("live_alerts","select=*&quiz_id=eq."+sel+"&order=created_at.desc&limit=20")]);setSessions(s||[]);setAlerts(a||[]);setLastRef(new Date());}catch(e){console.error(e);}}
+  useEffect(()=>{loadQ();},[]);
+  useEffect(()=>{refresh();clearInterval(ref.current);if(sel)ref.current=setInterval(refresh,MON_REFRESH);return()=>clearInterval(ref.current);},[sel]);
+  async function send(){if(!alertMsg.trim()||!sel)return;setSending(true);try{await dbInsert("live_alerts",{id:uid(),quiz_id:sel,candidate_id:target==="all"?null:target,message:alertMsg.trim(),type:alertType});setAlertMsg("");await refresh();}catch(e){alert("Error: "+e.message);}setSending(false);}
+  const quiz=quizzes.find(q=>q.id===sel); const now=Date.now();
+  const online=sessions.filter(s=>s.status==="active"&&(now-new Date(s.last_seen))<ONLINE_MS);
+  function name(id){return candidates.find(c=>c.id===id)?.name||id;}
+  const AC={warning:{bg:"rgba(234,179,8,.1)",bd:"rgba(234,179,8,.4)",c:"#eab308",i:"⚠️"},urgent:{bg:"rgba(239,68,68,.1)",bd:"rgba(239,68,68,.4)",c:"#ef4444",i:"🚨"},info:{bg:"rgba(99,102,241,.1)",bd:"rgba(99,102,241,.4)",c:"#a78bfa",i:"ℹ️"}};
+  return (
+    <Page title="Live Monitor" sub="Real-time exam supervision">
+      {loading&&<Loader/>}
+      {!loading&&<>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>{quizzes.length===0&&<Empty text="No published quizzes."/>}{quizzes.map(q=>(<button key={q.id} style={{...C.chip,...(sel===q.id?C.chipOn:{})}} onClick={()=>setSel(q.id)}>{q.title}</button>))}</div>
+        {sel&&<>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:18}}>
+            {[[sessions.length,"In Exam","#a78bfa"],[online.length,"Online","#22c55e"],[sessions.length-online.length,"Offline","#6b7280"],[sessions.reduce((a,s)=>a+(s.violations_count||0),0),"Violations","#ef4444"],[lastRef?timeAgo(lastRef):"—","Last Refresh","#f59e0b"]].map(([v,l,c])=>(
+              <div key={l} style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:"13px 16px",textAlign:"center"}}>
+                <div style={{fontSize:20,fontWeight:900,color:c}}>{v}</div>
+                <div style={{fontSize:10,color:"#4b5563",marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 350px",gap:16}}>
+            <div>
+              <SL>📡 Candidate Status</SL>
+              {sessions.length===0&&<Empty text="No candidates started yet."/>}
+              {sessions.map(s=>{const on=(now-new Date(s.last_seen))<ONLINE_MS;const pct=quiz?(s.answers_count||0)/((quiz.questions||[]).length||1)*100:0;return(
+                <div key={s.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid "+(on?"rgba(34,197,94,.2)":"rgba(255,255,255,.05)"),borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <div style={{width:7,height:7,borderRadius:"50%",background:on?"#22c55e":"#374151",flexShrink:0,animation:on?"pulse 2s infinite":"none"}}/>
+                    <span style={{fontWeight:600,color:"#f9fafb",flex:1,fontSize:14}}>{name(s.candidate_id)}</span>
+                    <Badge label={on?"Online":"Offline"} color={on?"green":"gray"}/>
+                    {(s.violations_count||0)>0&&<Badge label={s.violations_count+" ⚠"} color="red"/>}
+                    <button onClick={()=>{setTarget(s.candidate_id);setAlertMsg("");}} style={{background:"rgba(234,179,8,.1)",border:"1px solid rgba(234,179,8,.2)",borderRadius:6,padding:"3px 8px",color:"#eab308",cursor:"pointer",fontSize:11,fontWeight:600}}>Flag</button>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{flex:1,background:"rgba(255,255,255,.05)",borderRadius:4,height:4,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,#6366f1,#8b5cf6)",transition:"width .5s"}}/></div>
+                    <span style={{fontSize:11,color:"#4b5563"}}>{s.answers_count||0}/{(quiz?.questions||[]).length||0}</span>
+                    <span style={{fontSize:11,color:"#374151"}}>{timeAgo(s.last_seen)}</span>
+                  </div>
+                </div>
+              );})}
+            </div>
+            <div>
+              <SL>📨 Send Live Alert</SL>
+              <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,padding:14,marginBottom:14}}>
+                <Fld label="Send To"><select style={C.inp} value={target} onChange={e=>setTarget(e.target.value)}><option value="all">📢 All Candidates</option>{sessions.map(s=>(<option key={s.id} value={s.candidate_id}>{name(s.candidate_id)}</option>))}</select></Fld>
+                <Fld label="Type"><select style={C.inp} value={alertType} onChange={e=>setAlertType(e.target.value)}><option value="warning">⚠️ Warning</option><option value="urgent">🚨 Urgent</option><option value="info">ℹ️ Info</option></select></Fld>
+                <Fld label="Message"><textarea style={{...C.inp,minHeight:70,resize:"vertical"}} value={alertMsg} onChange={e=>setAlertMsg(e.target.value)} placeholder="Message..."/></Fld>
+                <button onClick={send} disabled={sending||!alertMsg.trim()} style={{...C.btn,width:"100%",justifyContent:"center",background:"linear-gradient(135deg,#d97706,#b45309)"}}>{Ico.send} {sending?"Sending...":"Send Alert"}</button>
+              </div>
+              <SL>Recent Alerts</SL>
+              {alerts.length===0&&<div style={{color:"#374151",fontSize:13,textAlign:"center",padding:"10px 0"}}>No alerts sent.</div>}
+              <div style={{maxHeight:260,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
+                {alerts.map(a=>{const ac=AC[a.type]||AC.info;return(<div key={a.id} style={{background:ac.bg,border:"1px solid "+ac.bd,borderRadius:8,padding:"8px 12px"}}><div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span>{ac.i}</span><span style={{fontSize:12,fontWeight:700,color:ac.c}}>{a.candidate_id?name(a.candidate_id):"All"}</span><span style={{fontSize:10,color:"#374151",marginLeft:"auto"}}>{timeAgo(a.created_at)}</span></div><div style={{fontSize:12,color:"#d1d5db"}}>{a.message}</div></div>);})}
+              </div>
+            </div>
+          </div>
+        </>}
+      </>}
+    </Page>
+  );
+}
+
+// ── ANNOUNCEMENTS ─────────────────────────────────────────────────────────────
+function AnnManager() {
+  const [list,setList]=useState([]); const [loading,setLoading]=useState(true); const [showForm,setShowForm]=useState(false); const [editing,setEditing]=useState(null); const [form,setForm]=useState({title:"",message:"",type:"info",active:true}); const [saving,setSaving]=useState(false);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  async function load(){setLoading(true);try{const d=await dbGet("announcements","select=*&order=created_at.desc");setList(d||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  function openNew(){setForm({title:"",message:"",type:"info",active:true});setEditing(null);setShowForm(true);}
+  function openEdit(a){setForm({title:a.title,message:a.message,type:a.type,active:a.active});setEditing(a.id);setShowForm(true);}
+  async function save(){if(!form.title.trim()||!form.message.trim())return;setSaving(true);try{if(editing)await dbUpdate("announcements",{id:editing},form);else await dbInsert("announcements",{...form,id:uid()});await load();setShowForm(false);setEditing(null);}catch(e){alert("Error: "+e.message);}setSaving(false);}
+  async function toggle(a){try{await dbUpdate("announcements",{id:a.id},{active:!a.active});await load();}catch(e){alert(e.message);}}
+  async function del(id){try{await dbDelete("announcements",{id});setList(p=>p.filter(x=>x.id!==id));}catch(e){alert(e.message);}}
+  return (
+    <Page title="Announcements" sub="Notify candidates" action={<Btn primary onClick={openNew}>{Ico.plus} New</Btn>}>
+      {showForm&&(<div style={{background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.15)",borderRadius:14,padding:18,marginBottom:18,animation:"slideDown .2s ease"}}>
+        <G2><Fld label="Title"><input style={C.inp} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Title"/></Fld><Fld label="Type"><select style={C.inp} value={form.type} onChange={e=>f("type",e.target.value)}>{Object.entries(ANN).map(([k,v])=>(<option key={k} value={k}>{v.icon} {v.label}</option>))}</select></Fld></G2>
+        <Fld label="Message"><textarea style={{...C.inp,minHeight:80,resize:"vertical"}} value={form.message} onChange={e=>f("message",e.target.value)} placeholder="Message..."/></Fld>
+        <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#9ca3af",cursor:"pointer",marginBottom:12}}><input type="checkbox" checked={form.active} onChange={e=>f("active",e.target.checked)}/> Active (visible to candidates)</label>
+        <div style={{display:"flex",gap:8}}><Btn primary onClick={save}>{saving?"Saving...":editing?"Update":"Post"}</Btn><Btn ghost onClick={()=>{setShowForm(false);setEditing(null);}}>Cancel</Btn></div>
+      </div>)}
+      {loading&&<Loader/>}{!loading&&list.length===0&&<Empty text="No announcements yet."/>}
+      {list.map(a=>{const t=ANN[a.type]||ANN.info;return(
+        <div key={a.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:12,overflow:"hidden",marginBottom:8}}>
+          <div style={{background:t.bg,borderLeft:"3px solid "+t.bd,padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><span style={{fontSize:16}}>{t.icon}</span><span style={{fontWeight:700,color:t.color,fontSize:14}}>{a.title}</span></div><div style={{fontSize:13,color:"#d1d5db",lineHeight:1.6}}>{a.message}</div></div>
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",background:"rgba(0,0,0,.15)"}}><Badge label={a.active?"Active":"Hidden"} color={a.active?"green":"gray"}/><span style={{fontSize:11,color:"#374151",marginLeft:"auto"}}>{fmtDate(a.created_at)}</span><button onClick={()=>toggle(a)} style={{background:a.active?"rgba(239,68,68,.1)":"rgba(34,197,94,.1)",border:"1px solid "+(a.active?"rgba(239,68,68,.2)":"rgba(34,197,94,.2)"),borderRadius:5,padding:"3px 10px",color:a.active?"#ef4444":"#22c55e",cursor:"pointer",fontSize:12,fontWeight:600}}>{a.active?"Hide":"Show"}</button><Btn onClick={()=>openEdit(a)}>{Ico.edit}</Btn><Btn danger onClick={()=>del(a.id)}>{Ico.trash}</Btn></div>
+        </div>
+      );})}
+    </Page>
+  );
+}
+
+// ── VIOLATIONS ────────────────────────────────────────────────────────────────
+function ViolationsPanel() {
+  const [data,setData]=useState([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{(async()=>{setLoading(true);try{const [s,c,q]=await Promise.all([dbGet("submissions","select=id,candidate_id,quiz_id,violations,submitted_at"),dbGet("candidates","select=id,name"),dbGet("quizzes","select=id,title")]);setData((s||[]).map(s=>({...s,violations:s.violations||[],cname:(c||[]).find(x=>x.id===s.candidate_id)?.name||"Unknown",qtitle:(q||[]).find(x=>x.id===s.quiz_id)?.title||"Unknown"})).filter(s=>s.violations.length>0));}catch(e){console.error(e);}setLoading(false);})();},[]);
+  return (
+    <Page title="Anti-Cheat Violations" sub="Recorded integrity issues">
+      {loading&&<Loader/>}{!loading&&data.length===0&&<Empty text="No violations recorded. All clean ✓"/>}
+      {data.map(s=>(<div key={s.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(239,68,68,.15)",borderRadius:12,padding:16,marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}><span style={{fontWeight:700,color:"#f9fafb"}}>{s.cname}</span><span style={{color:"#4b5563",fontSize:13}}>— {s.qtitle}</span><Badge label={s.violations.length+" violation"+(s.violations.length>1?"s":"")} color="red"/></div>{s.violations.map((v,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,.06)",borderRadius:7,padding:"6px 10px",marginBottom:4}}>{Ico.warn} <strong>#{i+1}</strong> &nbsp;{v.type}<span style={{color:"#374151",fontSize:11,marginLeft:"auto"}}>{fmtDate(v.time)}</span></div>))}</div>))}
+    </Page>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CANDIDATE APP
+// ══════════════════════════════════════════════════════════════════════════════
+function CandidateApp({user,onLogout}) {
+  const [tab,setTab]=useState("exams"); const [quizzes,setQuizzes]=useState([]); const [subs,setSubs]=useState([]); const [ann,setAnn]=useState([]); const [active,setActive]=useState(null); const [loading,setLoading]=useState(true); const [dismissed,setDismissed]=useState([]);
+  async function load(){setLoading(true);try{const [q,s,a]=await Promise.all([dbGet("quizzes","select=*&status=in.(published,graded)"),dbGet("submissions","select=*&candidate_id=eq."+user.id),dbGet("announcements","select=*&active=eq.true&order=created_at.desc")]);setQuizzes((q||[]).map(x=>({...x,scheduledFor:x.scheduled_for,resultsReleased:x.results_released})));setSubs(s||[]);setAnn(a||[]);}catch(e){console.error(e);}setLoading(false);}
+  useEffect(()=>{load();},[]);
+  async function submitQuiz(quizId,answers,violations){try{await dbInsert("submissions",{id:uid(),quiz_id:quizId,candidate_id:user.id,answers,violations:violations||[]});}catch(e){alert("Submit error: "+e.message);}setActive(null);load();}
+  if(active) return <Attempt quiz={active} user={user} onSubmit={(ans,viols)=>submitQuiz(active.id,ans,viols)}/>;
+  const visAnn=ann.filter(a=>!dismissed.includes(a.id));
+  const nav=[{id:"exams",e:"📋",l:"Exams"},{id:"results",e:"📊",l:"My Results"},{id:"notices",e:"📢",l:"Notices"+(visAnn.length>0?" ("+visAnn.length+")":"")}];
+  return (
+    <div style={{display:"flex",minHeight:"100vh",background:"#07070f"}}>
+      <div style={{width:210,background:"rgba(255,255,255,.015)",borderRight:"1px solid rgba(255,255,255,.05)",display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
+        <div style={{padding:"20px 16px 12px",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
+          <div style={{fontSize:16,fontWeight:900,background:"linear-gradient(135deg,#c4b5fd,#818cf8)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"-1px"}}>EXAMCORE</div>
+          <div style={{fontSize:10,color:"#374151",textTransform:"uppercase",letterSpacing:"1.5px",marginTop:2}}>Candidate</div>
+        </div>
+        <div style={{margin:"8px 10px",background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.15)",borderRadius:10,padding:"9px 11px",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,#8b5cf6,#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff",flexShrink:0}}>{user.name[0]?.toUpperCase()||"?"}</div>
+          <div><div style={{fontSize:12,fontWeight:700,color:"#f9fafb",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>{user.name}</div><div style={{fontSize:10,color:"#8b5cf6"}}>@{user.username}</div></div>
+        </div>
+        <nav style={{flex:1,padding:"4px 10px"}}>
+          {nav.map(n=>(<button key={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"9px 10px",borderRadius:8,background:tab===n.id?"rgba(139,92,246,.15)":"transparent",border:"none",color:tab===n.id?"#c4b5fd":"#6b7280",cursor:"pointer",fontSize:13,fontWeight:tab===n.id?700:400,marginBottom:2,textAlign:"left"}}><span style={{fontSize:15}}>{n.e}</span>{n.l}</button>))}
+        </nav>
+        <div style={{padding:"8px 10px",borderTop:"1px solid rgba(255,255,255,.05)"}}><button onClick={onLogout} onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#4b5563"} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"9px 10px",borderRadius:8,background:"transparent",border:"none",color:"#4b5563",cursor:"pointer",fontSize:13,transition:"color .15s"}}><span style={{fontSize:15}}>🚪</span> Logout</button></div>
+      </div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <div style={{background:"rgba(255,255,255,.015)",borderBottom:"1px solid rgba(255,255,255,.05)",padding:"13px 26px",position:"sticky",top:0,zIndex:40,backdropFilter:"blur(10px)"}}>
+          <div style={{fontSize:17,fontWeight:800,color:"#f9fafb"}}>{nav.find(n=>n.id===tab)?.e} {nav.find(n=>n.id===tab)?.l.split(" (")[0]}</div>
+          <div style={{fontSize:11,color:"#374151",marginTop:1}}>Hello, {user.name}!</div>
+        </div>
+        <div style={{padding:"22px 26px"}}>
+          {loading&&<Loader/>}
+          {!loading&&tab==="exams"&&(
+            <div style={{maxWidth:720}}>
+              {visAnn.filter(a=>a.type==="urgent").map(a=>{const t=ANN[a.type]||ANN.info;return(<div key={a.id} style={{background:t.bg,borderLeft:"3px solid "+t.bd,borderRadius:10,padding:"12px 16px",marginBottom:10,position:"relative",animation:"slideDown .3s ease"}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}><span style={{fontSize:16}}>{t.icon}</span><span style={{fontWeight:700,color:t.color}}>{a.title}</span></div><div style={{fontSize:13,color:"#d1d5db"}}>{a.message}</div><button onClick={()=>setDismissed(p=>[...p,a.id])} style={{position:"absolute",top:8,right:10,background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>×</button></div>);})}
+              {quizzes.length===0&&<Empty text="No exams available right now."/>}
+              {quizzes.map(q=>{const sub=subs.find(s=>s.quiz_id===q.id);const scheduled=q.scheduledFor?new Date(q.scheduledFor):null;const upcoming=scheduled&&new Date()<scheduled;const totalM=(q.questions||[]).reduce((a,x)=>a+x.marks,0);return(
+                <div key={q.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20,marginBottom:10}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:10}}>
+                    <div style={{width:42,height:42,borderRadius:12,background:"rgba(99,102,241,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📋</div>
+                    <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:"#f9fafb",marginBottom:4}}>{q.title}</div><div style={{fontSize:12,color:"#4b5563",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>{Ico.clock} {q.duration} min · {(q.questions||[]).length} Qs · {totalM} marks{scheduled&&<> · {fmtDate(q.scheduledFor)}</>}</div></div>
+                  </div>
+                  <div style={{fontSize:11,color:"#374151",marginBottom:10,padding:"5px 10px",background:"rgba(255,255,255,.02)",borderRadius:6}}>🛡 Anti-cheat monitoring enabled</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>{upcoming&&<Badge label="Not open yet" color="gray"/>}{sub&&!q.resultsReleased&&<Badge label="Submitted — awaiting results" color="blue"/>}{sub&&q.resultsReleased&&<Badge label={"Score: "+sub.score+" / "+totalM} color="green"/>}{!sub&&!upcoming&&<Btn primary onClick={()=>setActive(q)}>Start Exam →</Btn>}</div>
+                </div>
+              );})}
+            </div>
+          )}
+          {!loading&&tab==="results"&&(
+            <div style={{maxWidth:720}}>
+              {subs.length===0&&<Empty text="No exams attempted yet."/>}
+              {subs.map(s=>{const q=quizzes.find(x=>x.id===s.quiz_id);if(!q)return null;const total=(q.questions||[]).reduce((a,x)=>a+x.marks,0)||1;const v=s.violations||[];const pct=q.resultsReleased?((s.score/total)*100).toFixed(1):0;return(
+                <div key={s.id} style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderRadius:14,padding:20,marginBottom:10}}>
+                  <div style={{fontSize:16,fontWeight:700,color:"#f9fafb",marginBottom:4}}>{q.title}</div>
+                  <div style={{fontSize:12,color:"#4b5563",marginBottom:12}}>Submitted: {fmtDate(s.submitted_at)}</div>
+                  {q.resultsReleased?(<><div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:10}}><span style={{fontSize:48,fontWeight:900,color:"#a78bfa",lineHeight:1}}>{s.score}</span><span style={{fontSize:22,color:"#374151"}}>/ {total}</span><span style={{fontSize:16,color:"#22c55e",fontWeight:700}}>{pct}%</span></div><div style={{background:"rgba(255,255,255,.04)",borderRadius:8,height:8,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+(pct>=75?"#22c55e":pct>=50?"#eab308":"#ef4444")+","+(pct>=75?"#16a34a":pct>=50?"#ca8a04":"#dc2626")+")"}}/></div></>):<Badge label="Results not released yet" color="gray"/>}
+                  {v.length>0&&<div style={{marginTop:10,fontSize:12,color:"#fca5a5",padding:"5px 10px",background:"rgba(239,68,68,.06)",borderRadius:6}}>⚠ {v.length} violation(s) recorded</div>}
+                </div>
+              );})}
+            </div>
+          )}
+          {!loading&&tab==="notices"&&(
+            <div style={{maxWidth:720}}>
+              {ann.length===0&&<Empty text="No announcements right now."/>}
+              {ann.map(a=>{const t=ANN[a.type]||ANN.info;return(<div key={a.id} style={{borderRadius:14,overflow:"hidden",marginBottom:10}}><div style={{background:t.bg,borderLeft:"3px solid "+t.bd,padding:"14px 18px"}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}><span style={{fontSize:18}}>{t.icon}</span><span style={{fontWeight:700,color:t.color,fontSize:15}}>{a.title}</span></div><div style={{fontSize:14,color:"#d1d5db",lineHeight:1.7}}>{a.message}</div></div><div style={{padding:"7px 18px",background:"rgba(0,0,0,.2)",fontSize:11,color:"#374151"}}>Posted {fmtDate(a.created_at)}</div></div>);})}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ATTEMPT ───────────────────────────────────────────────────────────────────
+function Attempt({quiz,user,onSubmit}) {
+  const [cur,setCur]=useState(0); const [answers,setAnswers]=useState({}); const [flags,setFlags]=useState({}); const [visited,setVisited]=useState({0:true}); const [secs,setSecs]=useState(quiz.duration*60); const [confirm,setConfirm]=useState(false); const [submitting,setSubmitting]=useState(false); const [violations,setViolations]=useState([]); const [toast,setToast]=useState(null); const [isFS,setIsFS]=useState(false); const [adminAlerts,setAdminAlerts]=useState([]); const [alertPopup,setAlertPopup]=useState(null);
+  const timerRef=useRef(null); const violRef=useRef([]); const ansRef=useRef({}); const doneRef=useRef(false); const hbRef=useRef(null); const pollRef=useRef(null); const sidRef=useRef(uid()); const lastAlertRef=useRef(null);
+  useEffect(()=>{violRef.current=violations;},[violations]);
+  useEffect(()=>{ansRef.current=answers;},[answers]);
+  async function upsertSession(extra){try{await sbFetch("POST","exam_sessions?on_conflict=candidate_id,quiz_id","",{id:sidRef.current,candidate_id:user.id,quiz_id:quiz.id,last_seen:new Date().toISOString(),answers_count:Object.keys(ansRef.current).filter(k=>{const a=ansRef.current[k];return a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);}).length,violations_count:violRef.current.length,status:"active",...(extra||{})});}catch(e){console.warn(e.message);}}
+  async function pollAlerts(){try{const rows=await dbGet("live_alerts","select=*&quiz_id=eq."+quiz.id+"&order=created_at.desc&limit=10");const rel=(rows||[]).filter(a=>a.candidate_id===null||a.candidate_id===user.id);if(rel.length>0){const n=rel[0];if(lastAlertRef.current!==n.id){lastAlertRef.current=n.id;setAlertPopup(n);setAdminAlerts(rel);setTimeout(()=>setAlertPopup(null),8000);}}}catch(e){console.warn(e.message);}}
+  useEffect(()=>{upsertSession();hbRef.current=setInterval(()=>upsertSession(),HEARTBEAT);pollRef.current=setInterval(pollAlerts,ALERT_POLL);pollAlerts();return()=>{clearInterval(hbRef.current);clearInterval(pollRef.current);};},[]);
+  useEffect(()=>{const el=document.documentElement;const fn=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen;if(fn)fn.call(el).then(()=>setIsFS(true)).catch(()=>{});const chg=()=>{const f=!!(document.fullscreenElement||document.webkitFullscreenElement);setIsFS(f);if(!f&&!doneRef.current)addV("Exited fullscreen");};document.addEventListener("fullscreenchange",chg);document.addEventListener("webkitfullscreenchange",chg);return()=>{document.removeEventListener("fullscreenchange",chg);document.removeEventListener("webkitfullscreenchange",chg);if(document.fullscreenElement)document.exitFullscreen&&document.exitFullscreen();};},[]);
+  useEffect(()=>{const fn=()=>{if(document.hidden&&!doneRef.current)addV("Switched tab");};document.addEventListener("visibilitychange",fn);return()=>document.removeEventListener("visibilitychange",fn);},[]);
+  useEffect(()=>{const fn=()=>{if(!doneRef.current)addV("Window lost focus");};window.addEventListener("blur",fn);return()=>window.removeEventListener("blur",fn);},[]);
+  useEffect(()=>{const fn=e=>{if(e.ctrlKey||e.metaKey||e.key==="F12"||e.key==="PrintScreen"){e.preventDefault();e.stopPropagation();if(!doneRef.current)addV("Blocked key: "+e.key);}};document.addEventListener("keydown",fn,true);return()=>document.removeEventListener("keydown",fn,true);},[]);
+  useEffect(()=>{const cp=e=>{e.preventDefault();if(!doneRef.current)addV("Copy");};const ps=e=>{e.preventDefault();if(!doneRef.current)addV("Paste");};const rc=e=>{e.preventDefault();if(!doneRef.current)addV("Right-click");};document.addEventListener("copy",cp);document.addEventListener("paste",ps);document.addEventListener("contextmenu",rc);return()=>{document.removeEventListener("copy",cp);document.removeEventListener("paste",ps);document.removeEventListener("contextmenu",rc);};},[]);
+  useEffect(()=>{timerRef.current=setInterval(()=>{setSecs(s=>{if(s<=1){clearInterval(timerRef.current);doSubmit("Time expired");return 0;}return s-1;});},1000);return()=>clearInterval(timerRef.current);},[]);
+  function addV(type){if(doneRef.current)return;const v={type,time:new Date().toISOString()};const upd=[...violRef.current,v];violRef.current=upd;setViolations(upd);setToast({msg:type,count:upd.length,left:MAX_WARN-upd.length});setTimeout(()=>setToast(null),4000);if(upd.length>=MAX_WARN)doSubmit("Auto-submitted: too many violations");}
+  async function doSubmit(reason){if(doneRef.current)return;doneRef.current=true;clearInterval(timerRef.current);clearInterval(hbRef.current);clearInterval(pollRef.current);setSubmitting(true);await upsertSession({status:"submitted"});const v=reason?[...violRef.current,{type:reason,time:new Date().toISOString()}]:violRef.current;await onSubmit(ansRef.current,v);setSubmitting(false);}
+  function reFS(){const el=document.documentElement;const fn=el.requestFullscreen||el.webkitRequestFullscreen;if(fn)fn.call(el).then(()=>setIsFS(true)).catch(()=>{});}
+  const questions=quiz.questions||[]; const q=questions[cur]; const mm=String(Math.floor(secs/60)).padStart(2,"0"); const ss2=String(secs%60).padStart(2,"0"); const urg=secs<300;
+  function go(i){setCur(i);setVisited(v=>({...v,[i]:true}));}
+  function ans(val){if(q.type==="mcq_multi"){const p=Array.isArray(answers[q.id])?answers[q.id]:[];setAnswers(a=>({...a,[q.id]:p.includes(val)?p.filter(x=>x!==val):[...p,val]}));}else setAnswers(a=>({...a,[q.id]:val}));}
+  function clearAns(){setAnswers(a=>{const n={...a};delete n[q.id];return n;});}
+  function qSt(i){const qi=questions[i];const a=answers[qi.id];const has=a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);const fl=flags[qi.id];if(fl&&has)return"fa";if(fl)return"f";if(has)return"a";if(visited[i])return"v";return"n";}
+  const SC={n:"#1f2937",v:"#7f1d1d",a:"#14532d",f:"#78350f",fa:"#581c87"};
+  const answered=questions.filter((_,i)=>{const a=answers[questions[i].id];return a!==undefined&&a!==""&&!(Array.isArray(a)&&a.length===0);}).length;
+  const AC={warning:{bg:"rgba(234,179,8,.15)",bd:"rgba(234,179,8,.5)",c:"#eab308",i:"⚠️"},urgent:{bg:"rgba(239,68,68,.15)",bd:"rgba(239,68,68,.5)",c:"#ef4444",i:"🚨"},info:{bg:"rgba(99,102,241,.15)",bd:"rgba(99,102,241,.5)",c:"#a78bfa",i:"ℹ️"}};
+  if(!q) return <div style={{padding:40,color:"#f9fafb"}}>No questions found.</div>;
+  return (
+    <div className="exam-mode" style={{display:"flex",flexDirection:"column",minHeight:"100vh",background:"#07070f",color:"#e5e7eb"}}>
+      {toast&&(<div style={{position:"fixed",top:72,left:"50%",transform:"translateX(-50%)",zIndex:1000,background:"#1a0505",border:"1px solid rgba(239,68,68,.5)",borderRadius:12,padding:"12px 20px",minWidth:300,boxShadow:"0 0 40px rgba(239,68,68,.3)",animation:"shake .4s ease"}}><div style={{color:"#fca5a5",fontWeight:700,fontSize:14,marginBottom:3}}>⚠ {toast.msg}</div><div style={{color:"#ef4444",fontSize:13,fontWeight:700}}>Warning {toast.count}/{MAX_WARN} — {toast.left} more = auto-submit</div></div>)}
+      {alertPopup&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:1999}}/>}
+      {alertPopup&&(()=>{const ac=AC[alertPopup.type]||AC.info;return(<div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:2000,background:"#0d0d1a",border:"2px solid "+ac.bd,borderRadius:18,padding:30,maxWidth:380,width:"90%",boxShadow:"0 0 60px "+ac.bd,animation:"popIn .3s ease"}}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:40,marginBottom:8}}>{ac.i}</div><div style={{fontSize:18,fontWeight:800,color:ac.c}}>Message from Admin</div></div><div style={{background:ac.bg,border:"1px solid "+ac.bd,borderRadius:10,padding:"14px 16px",marginBottom:16,fontSize:15,color:"#f9fafb",lineHeight:1.7,textAlign:"center"}}>{alertPopup.message}</div><button onClick={()=>setAlertPopup(null)} style={{width:"100%",background:ac.bd,border:"none",borderRadius:8,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Got it</button></div>);})()}
+      {!isFS&&(<div style={{background:"rgba(220,38,38,.1)",borderBottom:"1px solid rgba(220,38,38,.2)",padding:"6px 20px",display:"flex",alignItems:"center",gap:10,fontSize:13}}><span style={{color:"#fca5a5"}}>⚠ Not in fullscreen.</span><button onClick={reFS} style={{background:"#dc2626",border:"none",borderRadius:5,padding:"3px 10px",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>Go Fullscreen</button></div>)}
+      <div style={{display:"flex",alignItems:"center",padding:"10px 20px",background:"rgba(0,0,0,.6)",borderBottom:"1px solid rgba(255,255,255,.06)",gap:14,position:"sticky",top:0,zIndex:50,backdropFilter:"blur(10px)"}}>
+        <div style={{flex:1,fontWeight:700,fontSize:15,color:"#f9fafb"}}>{quiz.title}</div>
+        <div style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#22c55e"}}><div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",animation:"pulse 2s infinite"}}/>Live</div>
+        {violations.length>0&&<div style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",borderRadius:6,padding:"4px 10px",fontSize:12,color:"#fca5a5"}}>⚠ {violations.length}</div>}
+        <div style={{background:urg?"rgba(220,38,38,.15)":"rgba(99,102,241,.12)",border:"1px solid "+(urg?"rgba(220,38,38,.35)":"rgba(99,102,241,.25)"),borderRadius:8,padding:"6px 14px",fontSize:18,fontWeight:800,color:urg?"#ef4444":"#a78bfa",display:"flex",alignItems:"center",gap:5}}>{Ico.clock} {mm}:{ss2}</div>
+        <button style={{...C.btn,background:"#dc2626",padding:"8px 16px"}} onClick={()=>setConfirm(true)}>Submit</button>
+      </div>
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        <div style={{flex:1,padding:"26px 34px",overflowY:"auto"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,color:"#4b5563",fontWeight:700}}>Q{cur+1} / {questions.length}</span>
+            <span style={{background:"rgba(99,102,241,.12)",color:"#a78bfa",fontSize:11,padding:"3px 10px",borderRadius:10,fontWeight:700}}>{q.type==="mcq"?"Single Correct":q.type==="mcq_multi"?"Multiple Correct":"Numerical"}</span>
+            <span style={{fontSize:13,color:"#22c55e",fontWeight:700}}>+{q.marks}</span>
+            <span style={{fontSize:13,color:"#ef4444",fontWeight:700}}>-{q.negMarks||0}</span>
+          </div>
+          <div style={{fontSize:17,color:"#f9fafb",lineHeight:1.8,marginBottom:28}}>{q.text}</div>
+          {(q.type==="mcq"||q.type==="mcq_multi")&&(<div style={{display:"flex",flexDirection:"column",gap:10}}>{q.options.map((o,i)=>{const sel=q.type==="mcq_multi"?(Array.isArray(answers[q.id])&&answers[q.id].includes(i)):answers[q.id]===i;return(<button key={i} onClick={()=>ans(i)} style={{display:"flex",alignItems:"center",gap:14,background:sel?"rgba(99,102,241,.15)":"rgba(255,255,255,.03)",border:"1px solid "+(sel?"rgba(99,102,241,.4)":"rgba(255,255,255,.07)"),borderRadius:10,padding:"13px 18px",cursor:"pointer",textAlign:"left",fontSize:15,color:sel?"#a78bfa":"#e5e7eb",width:"100%",transition:"all .15s"}}><span style={{width:30,height:30,borderRadius:"50%",background:sel?"rgba(99,102,241,.3)":"rgba(255,255,255,.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,color:sel?"#a78bfa":"#6b7280"}}>{String.fromCharCode(65+i)}</span><span>{o||<em style={{color:"#374151"}}>{"Option "+String.fromCharCode(65+i)}</em>}</span></button>);})}</div>)}
+          {q.type==="numerical"&&<input style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"13px 18px",color:"#f9fafb",fontSize:22,fontWeight:700,outline:"none",width:220,fontFamily:"monospace"}} type="number" placeholder="Your answer" value={answers[q.id]||""} onChange={e=>ans(e.target.value)}/>}
+          {adminAlerts.length>0&&(<div style={{marginTop:22,borderTop:"1px solid rgba(255,255,255,.05)",paddingTop:14}}><div style={{fontSize:11,color:"#374151",textTransform:"uppercase",letterSpacing:"1px",marginBottom:8,fontWeight:700}}>Admin Messages</div>{adminAlerts.slice(0,3).map(a=>{const ac=AC[a.type]||AC.info;return(<div key={a.id} style={{background:ac.bg,border:"1px solid "+ac.bd,borderRadius:7,padding:"8px 12px",marginBottom:5,display:"flex",alignItems:"center",gap:8}}><span>{ac.i}</span><span style={{fontSize:12,color:ac.c,fontWeight:600}}>{a.message}</span><span style={{fontSize:10,color:"#374151",marginLeft:"auto"}}>{timeAgo(a.created_at)}</span></div>);})}</div>)}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:24,flexWrap:"wrap"}}>
+            <button style={{background:"none",border:"1px solid rgba(255,255,255,.08)",borderRadius:7,padding:"7px 14px",color:"#4b5563",cursor:"pointer",fontSize:13}} onClick={clearAns}>Clear</button>
+            <button onClick={()=>setFlags(f=>({...f,[q.id]:!f[q.id]}))} style={{background:flags[q.id]?"rgba(180,83,9,.2)":"rgba(180,83,9,.08)",border:"1px solid "+(flags[q.id]?"rgba(180,83,9,.4)":"rgba(180,83,9,.15)"),borderRadius:7,padding:"7px 14px",color:"#d97706",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",gap:5}}>{Ico.flag} {flags[q.id]?"Unflag":"Flag"}</button>
+            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+              <button disabled={cur===0} onClick={()=>go(cur-1)} style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.15)",borderRadius:7,padding:"7px 16px",color:"#a78bfa",cursor:"pointer",fontSize:13,fontWeight:600}}>← Prev</button>
+              <button disabled={cur===questions.length-1} onClick={()=>go(cur+1)} style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.15)",borderRadius:7,padding:"7px 16px",color:"#a78bfa",cursor:"pointer",fontSize:13,fontWeight:600}}>Next →</button>
+            </div>
+          </div>
+        </div>
+        <div style={{width:208,background:"rgba(0,0,0,.3)",borderLeft:"1px solid rgba(255,255,255,.05)",padding:13,overflowY:"auto",flexShrink:0}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:10}}>Palette</div>
+          <div style={{display:"flex",flexDirection:"column",gap:3,marginBottom:12}}>{[["Answered","#14532d"],["Not Visited","#7f1d1d"],["Flagged","#78350f"],["Flag+Ans","#581c87"],["Unattempted","#1f2937"]].map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#374151"}}><div style={{width:9,height:9,borderRadius:3,background:v,flexShrink:0}}/>{k}</div>))}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:4,marginBottom:12}}>{questions.map((_,i)=>(<button key={i} onClick={()=>go(i)} style={{width:32,height:32,borderRadius:6,border:i===cur?"2px solid #a78bfa":"1px solid rgba(255,255,255,.08)",background:SC[qSt(i)],color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}</div>
+          <div style={{fontSize:12,marginBottom:12}}>
+            <div style={{color:"#22c55e",marginBottom:3}}>✓ {answered} answered</div>
+            <div style={{color:"#ef4444",marginBottom:3}}>✗ {questions.length-answered} left</div>
+            {violations.length>0&&<div style={{color:"#fca5a5"}}>⚠ {violations.length} violation{violations.length>1?"s":""}</div>}
+          </div>
+          <button style={{...C.btn,width:"100%",justifyContent:"center",background:"#dc2626",marginBottom:6,padding:"8px"}} onClick={()=>setConfirm(true)}>Submit Exam</button>
+          {!isFS&&<button onClick={reFS} style={{width:"100%",background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.15)",borderRadius:7,padding:"7px",color:"#a78bfa",cursor:"pointer",fontSize:12,fontWeight:600}}>↑ Fullscreen</button>}
+        </div>
+      </div>
+      {confirm&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}><div style={{background:"#0f0f1c",border:"1px solid rgba(255,255,255,.08)",borderRadius:18,padding:32,maxWidth:360,width:"90%",animation:"popIn .2s ease"}}><div style={{fontSize:20,fontWeight:800,color:"#f9fafb",marginBottom:10}}>Submit Exam?</div><div style={{color:"#6b7280",lineHeight:2,marginBottom:16}}>Answered: <strong style={{color:"#22c55e"}}>{answered}</strong> · Remaining: <strong style={{color:"#ef4444"}}>{questions.length-answered}</strong><br/>{violations.length>0&&<span style={{color:"#fca5a5"}}>⚠ {violations.length} violation(s) will be reported.<br/></span>}You cannot change answers after submitting.</div><div style={{display:"flex",gap:10,justifyContent:"flex-end"}}><Btn ghost onClick={()=>setConfirm(false)}>Continue</Btn><button style={{...C.btn,background:"#dc2626"}} disabled={submitting} onClick={()=>doSubmit(null)}>{submitting?"Submitting...":"Submit Now"}</button></div></div></div>)}
+    </div>
+  );
+}
+
+// ── SHARED UI ─────────────────────────────────────────────────────────────────
+function Page({title,sub,action,children}){return(<div style={{maxWidth:960,animation:"fadeIn .25s ease"}}>{(title||action)&&(<div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:22}}><div><div style={{fontSize:20,fontWeight:800,color:"#f9fafb"}}>{title}</div>{sub&&<div style={{fontSize:12,color:"#374151",marginTop:2}}>{sub}</div>}</div>{action&&<div>{action}</div>}</div>)}{children}</div>);}
+function Fld({label,children}){return <div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,color:"#4b5563",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontWeight:700}}>{label}</label>{children}</div>;}
+function G2({children}){return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{children}</div>;}
+function SL({children}){return <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"1px",marginBottom:8,marginTop:4}}>{children}</div>;}
+function Empty({text}){return <div style={{color:"#374151",fontSize:13,padding:"24px 0",textAlign:"center",border:"1px dashed rgba(255,255,255,.05)",borderRadius:10}}>{text}</div>;}
+function Loader(){return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"36px 0",gap:10,color:"#374151",fontSize:13}}><div style={{width:16,height:16,border:"2px solid rgba(99,102,241,.2)",borderTop:"2px solid #a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>Loading...</div>;}
+function Badge({label,color}){const m={green:["rgba(34,197,94,.12)","#22c55e"],blue:["rgba(96,165,250,.12)","#60a5fa"],gray:["rgba(107,114,128,.15)","#6b7280"],red:["rgba(239,68,68,.12)","#ef4444"],yellow:["rgba(234,179,8,.12)","#eab308"],purple:["rgba(168,85,247,.12)","#a78bfa"]};const c=m[color]||m.gray;return <span style={{background:c[0],color:c[1],borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;}
+function Btn({children,onClick,primary,ghost,danger,disabled}){let bg="rgba(255,255,255,.04)",bd="1px solid rgba(255,255,255,.08)",col="#6b7280";if(primary){bg="linear-gradient(135deg,#6366f1,#8b5cf6)";bd="none";col="#fff";}if(danger){bg="rgba(239,68,68,.08)";bd="1px solid rgba(239,68,68,.15)";col="#ef4444";}return <button disabled={disabled} style={{background:bg,border:bd,borderRadius:7,padding:"8px 14px",color:col,fontWeight:600,fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,transition:"all .15s"}} onClick={onClick}>{children}</button>;}
+
+const C={
+  btn:    {background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",borderRadius:8,padding:"9px 18px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6},
+  btnGhost:{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:7,padding:"8px 14px",color:"#6b7280",fontWeight:600,fontSize:13,cursor:"pointer"},
+  inp:    {width:"100%",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"10px 12px",color:"#f9fafb",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"},
+  chip:   {background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:20,padding:"7px 14px",color:"#6b7280",cursor:"pointer",fontSize:13,display:"inline-flex",alignItems:"center",transition:"all .15s"},
+  chipOn: {background:"rgba(99,102,241,.15)",borderColor:"rgba(99,102,241,.35)",color:"#a78bfa"},
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
